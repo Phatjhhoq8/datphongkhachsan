@@ -1,0 +1,29 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+# Dependencies
+**/vendor/
+**/node_modules/
+
+# Build, test, and runtime files
+**/dist/
+**/coverage/
+**/.phpunit.cache/
+backend/storage/logs/*.log
+backend/bootstrap/cache/*.php
+
+# Local database and Docker data
+*.sqlite
+*.sqlite3
+volumes/
+docker-data/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,6 @@
+<script setup>
+import ResourcePage from '../../admin/ResourcePage.vue'
+const columns=[{key:'id',label:'ID'},{key:'name',label:'Khách sạn'},{key:'city',label:'Thành phố'},{key:'phone',label:'Điện thoại'},{key:'status',label:'Trạng thái',format:'status'}]
+const fields=[{key:'slug',label:'Slug',required:true},{key:'name',label:'Tên khách sạn',required:true},{key:'city',label:'Thành phố',required:true},{key:'address',label:'Địa chỉ',required:true,full:true},{key:'phone',label:'Điện thoại'},{key:'email',label:'Email',type:'email'},{key:'star_rating',label:'Hạng sao',type:'number',min:1},{key:'checkin_time',label:'Giờ nhận phòng',type:'time',required:true,default:'14:00'},{key:'checkout_time',label:'Giờ trả phòng',type:'time',required:true,default:'12:00'},{key:'description',label:'Mô tả',type:'textarea',full:true},{key:'status',label:'Trạng thái',type:'select',default:'active',options:['active','inactive']}]
+</script>
+<template><ResourcePage title="Khách sạn" subtitle="Quản lý cơ sở lưu trú trong hệ thống" endpoint="/admin/hotels" item-key="hotels" :columns="columns" :fields="fields" create-label="Thêm khách sạn" :filters="[{key:'status',label:'Trạng thái',options:['active','inactive']}]" /></template>

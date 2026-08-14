@@ -1,0 +1,6 @@
+<script setup>
+import ResourcePage from '../../admin/ResourcePage.vue'
+const columns=[{key:'id',label:'ID'},{key:'name',label:'Dịch vụ'},{key:'hotel.name',label:'Khách sạn'},{key:'price',label:'Đơn giá',format:'money'},{key:'pricing_type',label:'Cách tính'},{key:'active',label:'Hoạt động',format:'status'}]
+const fields=[{key:'hotel_id',label:'ID khách sạn',type:'number',required:true},{key:'code',label:'Mã dịch vụ',required:true},{key:'name',label:'Tên dịch vụ',required:true},{key:'price',label:'Đơn giá',type:'number',min:0,required:true},{key:'cost',label:'Chi phí',type:'number',min:0},{key:'pricing_type',label:'Cách tính',type:'select',required:true,options:['per_booking','per_night','per_guest','per_unit']},{key:'description',label:'Mô tả',type:'textarea',full:true},{key:'active',label:'Hoạt động',type:'select',default:1,options:[{value:1,label:'Có'},{value:0,label:'Không'}]}]
+</script>
+<template><ResourcePage title="Dịch vụ" subtitle="Dịch vụ bổ sung và bảng giá" endpoint="/admin/services" item-key="services" :columns="columns" :fields="fields" create-label="Thêm dịch vụ" :filters="[{key:'active',label:'Hoạt động',options:[{value:1,label:'Có'},{value:0,label:'Không'}]}]" /></template>

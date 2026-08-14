@@ -1,0 +1,15 @@
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { api, apiError, responseData } from '../../api'
+import AdminState from '../../admin/AdminState.vue'
+
+const data=ref(null),loading=ref(false),error=ref('')
+const money=(value)=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(Number(value||0))
+const kpis=computed(()=>[
+  ['Doanh thu',money(data.value?.revenue),'Trong kỳ'],['Đặt phòng',data.value?.bookings_count??0,'Trong kỳ'],['Phòng có khách',`${data.value?.rooms_occupied??0}/${data.value?.rooms_total??0}`,'Hiện tại'],['Phòng đang dọn',data.value?.rooms_cleaning??0,'Hiện tại']
+])
+const revenue=computed(()=>data.value?.revenue_chart??data.value?.revenue??[])
+async function load(){loading.value=true;error.value='';try{data.value=responseData(await api.get('/admin/dashboard'))}catch(err){error.value=apiError(err)}finally{loading.value=false}}
+onMounted(load)
+</script>
+<template><section><header class="admin-page-head"><div><h1>Tổng quan vận hành</h1><p>Doanh thu, công suất và trải nghiệm khách hàng</p></div><button class="admin-button secondary" @click="load">Làm mới</button></header><AdminState :loading="loading" :error="error" :empty="!loading&&!error&&!data" @retry="load"/><template v-if="data&&!loading"><div class="admin-kpis"><article v-for="kpi in kpis" :key="kpi[0]" class="admin-card admin-kpi"><span class="admin-kpi-label">{{kpi[0]}}</span><strong class="admin-kpi-value">{{kpi[1]}}</strong><span class="admin-kpi-trend">{{kpi[2]}}</span></article></div><div class="admin-dashboard-grid"><article class="admin-card"><header class="admin-panel-head"><h2>Doanh thu 7 ngày</h2><strong>{{money(data.revenue_total??data.revenue_today)}}</strong></header><div class="admin-panel-body admin-bars"><div v-for="(point,index) in revenue" :key="index" class="admin-bar-item"><div class="admin-bar" :style="{height:`${Math.max(5,Number(point.percent??point.value??point.revenue??0)/(data.revenue_max||1)*100)}%`}"></div><span>{{point.label??point.date}}</span></div><p v-if="!revenue.length">Chưa có dữ liệu biểu đồ.</p></div></article><article class="admin-card"><header class="admin-panel-head"><h2>Chỉ số chất lượng</h2></header><div class="admin-panel-body"><div class="admin-progress-row"><div class="admin-progress-meta"><span>Công suất phòng</span><b>{{data.occupancy_rate??0}}%</b></div><div class="admin-progress"><span :style="{width:`${data.occupancy_rate??0}%`}"></span></div></div><div class="admin-progress-row"><div class="admin-progress-meta"><span>Khách hàng quay lại</span><b>{{data.loyalty_rate??0}}%</b></div><div class="admin-progress"><span :style="{width:`${data.loyalty_rate??0}%`}"></span></div></div><div class="admin-progress-row"><div class="admin-progress-meta"><span>Mức độ hài lòng</span><b>{{data.satisfaction_score??0}}/5</b></div><div class="admin-progress"><span :style="{width:`${(data.satisfaction_score??0)*20}%`}"></span></div></div></div></article></div></template></section></template>
