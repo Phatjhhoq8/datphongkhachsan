@@ -196,6 +196,13 @@ function calculateLateTime(timeStr, graceMinutes) {
   return `${String(lateHours).padStart(2, '0')}:${String(lateMinutes).padStart(2, '0')}`
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  if (parts.length !== 3) return dateStr
+  return `${parts[2]}/${parts[1]}/${parts[0]}`
+}
+
 onMounted(loadCheckout)
 </script>
 
@@ -221,11 +228,14 @@ onMounted(loadCheckout)
           
           <div class="late-checkout-policy">
             <h3 style="font-size: 13.5px; font-weight: 700; color: #13243a; margin-bottom: 8px;">Chính sách trả phòng trễ (Late Checkout)</h3>
-            <p style="font-size: 12.5px; margin: 4px 0;">Giờ nhận phòng dự kiến của quý khách: từ <strong>{{ guest.arrival_time || '14:00' }}</strong>.</p>
-            <p style="font-size: 12.5px; margin: 4px 0;">Giờ trả phòng dự kiến của quý khách: trước <strong>{{ guest.checkout_time || '12:00' }}</strong>.</p>
+            <p style="font-size: 12.5px; margin: 4px 0;">Giờ nhận phòng dự kiến của quý khách: từ <strong>{{ guest.arrival_time || '14:00' }}</strong> ngày <strong>{{ formatDate(checkin) }}</strong>.</p>
+            <p style="font-size: 12.5px; margin: 4px 0;">Giờ trả phòng dự kiến của quý khách: trước <strong>{{ guest.checkout_time || '12:00' }}</strong> ngày <strong>{{ formatDate(checkout) }}</strong>.</p>
             <p style="font-size: 12.5px; margin: 4px 0;">Thời gian châm chước trả trễ miễn phí: <strong>{{ seedQuote?.hotel?.late_checkout_grace_minutes ?? 30 }} phút</strong>.</p>
-            <p style="color: #991b1b; font-size: 12.5px; font-weight: 600; margin-top: 8px; line-height: 1.5;">
-              ⚠️ Nếu thực tế quý khách trả phòng muộn quá <strong>{{ calculateLateTime(guest.checkout_time || '12:00', seedQuote?.hotel?.late_checkout_grace_minutes ?? 30) }}</strong> (tức là quá giờ trả phòng dự kiến đã chọn + {{ seedQuote?.hotel?.late_checkout_grace_minutes ?? 30 }} phút châm chước), phí phạt trả muộn sẽ được áp dụng tự động bằng <strong>10% tiền phòng cho mỗi giờ trễ</strong> (tính trên giá phòng của 1 đêm, làm tròn lên theo giờ).
+            <p style="color: #991b1b; font-size: 12.5px; font-weight: 600; margin-top: 8px; line-height: 1.6;">
+              ⚠️ Nếu thực tế quý khách trả phòng muộn hơn <strong>{{ calculateLateTime(guest.checkout_time || '12:00', seedQuote?.hotel?.late_checkout_grace_minutes ?? 30) }}</strong> ngày <strong>{{ formatDate(checkout) }}</strong> (tức là sau giờ đăng ký + {{ seedQuote?.hotel?.late_checkout_grace_minutes ?? 30 }} phút châm chước):
+              <br />
+              Phí phạt trả muộn sẽ được áp dụng tự động bằng:
+              <span style="color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-block; margin-top: 4px; font-size: 12px; border: 1px solid #fecaca;">(Số giờ trễ thực tế) x (10% giá phòng của 1 đêm)</span>
             </p>
             <small style="display: block; color: #637083; margin-top: 6px; font-size: 11px; line-height: 1.4;">
               * Ví dụ: Nếu giá phòng là 1.000.000 VND/đêm, phí phạt trễ sẽ là 100.000 VND cho mỗi giờ trễ (10% của 1.000.000 VND). Phí này chỉ phát sinh khi trả phòng thực tế bị trễ so với giờ đã đăng ký.
