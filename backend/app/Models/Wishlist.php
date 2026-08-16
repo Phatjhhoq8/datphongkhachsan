@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Wishlist extends MongoModel
+class Wishlist extends Model
 {
     protected $fillable = ['user_id', 'room_type_id'];
 

@@ -105,6 +105,7 @@ class BookingController extends AdminController
                 'service_total' => 0, 'discount_total' => 0, 'currency' => 'VND',
                 'created_by' => $request->user()->id, 'user_id' => $request->user()->id,
                 'hotel_id' => $roomType->hotel_id,
+                'room_ids' => $rooms->modelKeys(),
                 'source' => 'walk_in',
             ] + $turnoverSnapshot + $this->cancellations->snapshot($hotel, $roomType, $turnoverSnapshot['scheduled_checkin_at']));
             $booking->rooms()->sync($rooms->modelKeys());
@@ -163,7 +164,7 @@ class BookingController extends AdminController
 
         if ($target === 'checked_in') {
             abort_if(now()->isBefore($this->turnover->scheduledCheckin($booking)), 422, 'Check-in is not available before the scheduled check-in time.');
-            $rooms = Room::query()->whereIn('_id', $booking->room_ids ?? [])->get();
+            $rooms = Room::query()->whereIn('id', $booking->room_ids ?? [])->get();
             $invalidRoom = $rooms->count() !== count($booking->room_ids ?? []) || $rooms->contains(
                 fn (Room $room) => ! $room->active
                     || $room->operational_status !== 'available'

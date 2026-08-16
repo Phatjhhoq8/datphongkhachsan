@@ -81,7 +81,7 @@ class OAuthProfileApiTest extends TestCase
         $this->mockSocialiteUser('google', $this->socialiteUser('verified-id', 'owner@example.com', true));
         $this->get('/api/v1/auth/oauth/google/callback')->assertRedirect();
 
-        $this->assertSame((string) $existing->_id, (string) User::query()->where('provider_id', 'verified-id')->firstOrFail()->_id);
+        $this->assertSame((string) $existing->id, (string) User::query()->where('provider_id', 'verified-id')->firstOrFail()->id);
         $this->assertDatabaseCount('users', 1);
 
         $this->mockSocialiteUser('google', $this->socialiteUser('attacker-id', 'owner@example.com', false));
@@ -95,7 +95,7 @@ class OAuthProfileApiTest extends TestCase
         $plainCode = str_repeat('x', 64);
         OAuthExchangeCode::query()->create([
             'code_hash' => hash('sha256', $plainCode),
-            'user_id' => (string) $user->_id,
+            'user_id' => (string) $user->id,
             'provider' => 'google',
             'expires_at' => now()->subSecond(),
         ]);
@@ -103,17 +103,6 @@ class OAuthProfileApiTest extends TestCase
         $this->postJson('/api/v1/auth/oauth/exchange', ['code' => $plainCode])
             ->assertUnprocessable()
             ->assertJsonPath('message', 'The exchange code is invalid or has expired.');
-    }
-
-    public function test_exchange_codes_have_a_five_minute_application_expiry_and_mongodb_ttl_cleanup(): void
-    {
-        $indexes = collect(iterator_to_array(
-            DB::connection('mongodb')->getMongoDB()->selectCollection('oauth_exchange_codes')->listIndexes()
-        ));
-        $ttl = $indexes->first(fn ($index) => $index->getName() === 'expires_at_1');
-
-        $this->assertNotNull($ttl);
-        $this->assertSame(0, $ttl['expireAfterSeconds']);
     }
 
     public function test_profile_update_is_owned_by_authenticated_user(): void
@@ -124,7 +113,7 @@ class OAuthProfileApiTest extends TestCase
         $this->actingAs($owner)->patchJson('/api/v1/auth/profile', [
             'name' => 'Updated Owner',
             'phone' => '0901234567',
-            'user_id' => (string) $other->_id,
+            'user_id' => (string) $other->id,
             'email' => 'stolen@example.com',
             'role' => 'super_admin',
         ])->assertOk()->assertJsonPath('data.name', 'Updated Owner');

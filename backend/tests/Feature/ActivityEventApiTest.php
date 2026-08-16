@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\ActivityEvent;
+use App\Models\Hotel;
+use App\Models\RoomType;
 use Tests\Concerns\RefreshMongoDatabase;
 use Tests\TestCase;
 
@@ -10,10 +12,18 @@ class ActivityEventApiTest extends TestCase
 {
     use RefreshMongoDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+    }
+
     public function test_public_client_can_store_an_allowlisted_activity_event(): void
     {
-        $hotelId = '66c05f2d8f14e91f8f0b1234';
-        $roomTypeId = '66c05f2d8f14e91f8f0b5678';
+        $hotel = Hotel::query()->firstOrFail();
+        $roomType = RoomType::query()->where('hotel_id', $hotel->id)->firstOrFail();
+        $hotelId = $hotel->id;
+        $roomTypeId = $roomType->id;
 
         $this->postJson('/api/v1/activity-events', [
             'event' => 'voice_search',
@@ -29,8 +39,8 @@ class ActivityEventApiTest extends TestCase
         $this->assertSame('voice_search', $event->event);
         $this->assertSame('session-demo-123456', $event->session_id);
         $this->assertSame('/hotel/search', $event->path);
-        $this->assertSame($hotelId, $event->hotel_id);
-        $this->assertSame($roomTypeId, $event->room_type_id);
+        $this->assertSame((int) $hotelId, (int) $event->hotel_id);
+        $this->assertSame((int) $roomTypeId, (int) $event->room_type_id);
         $this->assertSame(12, $event->duration_seconds);
         $this->assertSame('Tìm phòng Deluxe cho 2 người ngày mai', $event->metadata['transcript']);
         $this->assertNotNull($event->expires_at);
@@ -43,8 +53,8 @@ class ActivityEventApiTest extends TestCase
             'event' => 'booking_created',
             'session_id' => '',
             'path' => str_repeat('x', 501),
-            'hotel_id' => 'not-an-object-id',
-            'room_type_id' => '123',
+            'hotel_id' => 'not-an-integer',
+            'room_type_id' => 'not-an-integer',
             'duration_seconds' => 86401,
         ])->assertUnprocessable()->assertJsonValidationErrors([
             'event', 'session_id', 'path', 'hotel_id', 'room_type_id', 'duration_seconds',
@@ -68,7 +78,8 @@ class ActivityEventApiTest extends TestCase
             ],
         ])->assertCreated();
 
-        $metadata = ActivityEvent::query()->firstOrFail()->metadata;
+        $event = ActivityEvent::query()->firstOrFail();
+        $metadata = $event->metadata;
         $this->assertSame('Deluxe', $metadata['keyword']);
         $this->assertSame(300, strlen($metadata['transcript']));
         $this->assertSame(['safe' => 'tomorrow'], $metadata['nested']);
@@ -89,6 +100,6 @@ class ActivityEventApiTest extends TestCase
             ])->assertCreated();
         }
 
-        $this->assertDatabaseCount('activity_events', 4);
+        $this->assertDatabaseCount('activity_events', 4, 'mongodb');
     }
 }

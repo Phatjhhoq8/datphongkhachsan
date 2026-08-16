@@ -19,7 +19,7 @@ class HotelScope
         }
 
         return $user->hotel_id === null
-            ? $query->where('_id', '__no_hotel_scope__')
+            ? $query->where($query->getModel()->getKeyName(), '__no_hotel_scope__')
             : $query->where($column, $user->hotel_id);
     }
 }

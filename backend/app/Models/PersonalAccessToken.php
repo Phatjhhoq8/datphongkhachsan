@@ -7,9 +7,4 @@ use MongoDB\Laravel\Eloquent\DocumentModel;
 
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
-    use DocumentModel;
-
-    protected $connection = 'mongodb';
-
-    protected $keyType = 'string';
 }

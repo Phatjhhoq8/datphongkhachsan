@@ -1,6 +1,6 @@
 # DatPhong
 
-Website đặt phòng khách sạn với giao diện tham khảo trải nghiệm của các nền tảng OTA, không phải bản sao thương hiệu. Hệ thống sử dụng Laravel 12 làm REST API, Vue 3 làm giao diện, MongoDB 8 lưu toàn bộ dữ liệu nghiệp vụ và chạy replica set `rs0`, Redis phục vụ cache/queue/outbox, còn Node.js + Socket.io cập nhật sơ đồ phòng và chat theo thời gian thực. Ảnh phòng được lưu trên file storage; MongoDB chỉ lưu metadata và đường dẫn tham chiếu. Virtual Tour 3D được để dành cho giai đoạn mở rộng.
+Website đặt phòng khách sạn với giao diện tham khảo trải nghiệm của các nền tảng OTA, không phải bản sao thương hiệu. Hệ thống sử dụng Laravel 12 làm REST API, Vue 3 làm giao diện, MySQL làm cơ sở dữ liệu nghiệp vụ chính (thông tin khách hàng, sơ đồ phòng, hóa đơn, lịch đặt phòng, v.v.), MongoDB 8 (chạy replica set `rs0`) lưu lịch sử chat và logs/tracking, Redis phục vụ cache/queue/outbox, còn Node.js + Socket.io cập nhật sơ đồ phòng và chat theo thời gian thực. Ảnh phòng được lưu trên file storage; MongoDB/MySQL chỉ lưu metadata và đường dẫn tham chiếu. Virtual Tour 3D được để dành cho giai đoạn mở rộng.
 
 ## Khởi chạy bằng Docker
 
@@ -22,6 +22,7 @@ Các địa chỉ mặc định:
 | Backend health | http://localhost:8000/up |
 | Realtime health | http://localhost:3001/health |
 | MongoDB 8 trên máy host | `localhost:27017` |
+| MySQL 8.0 trên máy host | `localhost:3306` |
 
 Nếu cổng `27017` đã được sử dụng, tạo file `.env` từ `.env.example` và đổi `MONGODB_HOST_PORT`, ví dụ `MONGODB_HOST_PORT=27018`. Backend trong Docker vẫn kết nối tới `mongodb:27017` bằng URI `mongodb://mongodb:27017/datphong?replicaSet=rs0`. Redis chỉ được các service trong Docker sử dụng qua `redis:6379`, không công khai cổng ra máy host.
 

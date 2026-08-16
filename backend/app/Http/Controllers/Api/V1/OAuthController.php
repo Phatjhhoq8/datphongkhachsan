@@ -87,7 +87,7 @@ class OAuthController extends Controller
             $plainCode = Str::random(64);
             OAuthExchangeCode::query()->create([
                 'code_hash' => hash('sha256', $plainCode),
-                'user_id' => (string) $user->_id,
+                'user_id' => $user->id,
                 'provider' => $provider,
                 'expires_at' => now()->addMinutes(5),
             ]);
@@ -115,7 +115,7 @@ class OAuthController extends Controller
         }
 
         $consumed = OAuthExchangeCode::query()
-            ->where('_id', $exchange->_id)
+            ->where('id', $exchange->id)
             ->whereNull('used_at')
             ->where('expires_at', '>', now())
             ->update(['used_at' => now()]);

@@ -47,7 +47,7 @@ class AvailabilityService
         // Kiểm tra trùng lặp (overlap) với các booking đang hoạt động:
         // pending, confirmed, checked_in
         // Công thức overlap: A1 < B2 AND A2 > B1
-        $blockedRoomIds = \Illuminate\Support\Facades\DB::table('bookings')
+        $blockedRoomIds = \App\Models\Booking::query()
             ->whereIn('status', ['pending', 'confirmed', 'checked_in'])
             ->whereNull('cancelled_at')
             ->where(function ($query) use ($scheduledCheckin, $scheduledCheckout) {

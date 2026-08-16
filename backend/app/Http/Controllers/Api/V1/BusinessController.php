@@ -113,7 +113,7 @@ class BusinessController extends Controller
 
     public function wishlistStore(Request $request): JsonResponse
     {
-        $data = Validator::make($request->all(), ['room_type_id' => ['required', 'string', 'exists:room_types,id']])->validate();
+        $data = Validator::make($request->all(), ['room_type_id' => ['required', 'integer', 'exists:room_types,id']])->validate();
         $item = Wishlist::query()->firstOrCreate(['user_id' => $request->user()->id, 'room_type_id' => $data['room_type_id']]);
 
         return response()->json(['data' => $item], $item->wasRecentlyCreated ? 201 : 200);
@@ -135,7 +135,7 @@ class BusinessController extends Controller
     {
         $data = Validator::make($request->all(), [
             'booking_code' => ['required', 'string', 'exists:bookings,code'],
-            'room_type_id' => ['required', 'string', 'exists:room_types,id'],
+            'room_type_id' => ['required', 'integer', 'exists:room_types,id'],
             'rating_overall' => ['required', 'integer', 'between:1,5'],
             'rating_room' => ['required', 'integer', 'between:1,5'],
             'rating_service' => ['required', 'integer', 'between:1,5'],
@@ -145,7 +145,7 @@ class BusinessController extends Controller
         $booking = Booking::query()->where('code', $data['booking_code'])->firstOrFail();
         abort_unless($booking->created_by === $request->user()->id && $booking->status === 'checked_out', 403, 'Only the owner of a checked-out booking may review it.');
         $roomType = RoomType::query()->findOrFail($data['room_type_id']);
-        abort_unless(Room::query()->whereIn('_id', $booking->room_ids ?? [])->where('room_type_id', $roomType->id)->exists(), 422, 'Room type does not belong to this booking.');
+        abort_unless(Room::query()->whereIn('id', $booking->room_ids ?? [])->where('room_type_id', $roomType->id)->exists(), 422, 'Room type does not belong to this booking.');
 
         $review = Review::query()->create($data + [
             'booking_id' => $booking->id,
@@ -172,16 +172,16 @@ class BusinessController extends Controller
     private function quoteRules(bool $voucherRequired = false): array
     {
         return [
-            'room_type_id' => ['required', 'string', 'exists:room_types,id'],
+            'room_type_id' => ['required', 'integer', 'exists:room_types,id'],
             'checkin' => ['required', 'date'],
             'checkout' => ['required', 'date', 'after:checkin'],
             'rooms' => ['required', 'integer', 'between:1,20'],
             'adults' => ['required', 'integer', 'between:1,100'],
             'children' => ['nullable', 'integer', 'between:0,100'],
             'service_ids' => ['nullable', 'array'],
-            'service_ids.*' => ['string', 'distinct'],
+            'service_ids.*' => ['integer', 'distinct'],
             'services' => ['nullable', 'array'],
-            'services.*.id' => ['required', 'string'],
+            'services.*.id' => ['required', 'integer'],
             'services.*.quantity' => ['nullable', 'integer', 'between:1,100'],
             'voucher_code' => [$voucherRequired ? 'required' : 'nullable', 'string', 'max:100'],
             'guest_email' => ['nullable', 'email:rfc'],

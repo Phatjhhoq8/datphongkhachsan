@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class BookingStatusHistory extends MongoModel
+class BookingStatusHistory extends Model
 {
     public const UPDATED_AT = null;
 

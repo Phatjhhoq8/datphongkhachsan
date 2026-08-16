@@ -60,7 +60,7 @@ class BookingStateService
             } elseif ($status === 'checked_out') {
                 $checkedOutAt = now();
                 $attributes['checked_out_at'] = $checkedOutAt;
-                Room::query()->whereIn('_id', $booking->room_ids ?? [])->update([
+                Room::query()->whereIn('id', $booking->room_ids ?? [])->update([
                     'operational_status' => 'cleaning',
                     'cleaning_started_at' => $checkedOutAt,
                     'cleaning_completed_at' => null,

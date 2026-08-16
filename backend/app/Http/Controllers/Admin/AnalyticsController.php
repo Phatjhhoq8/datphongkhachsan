@@ -271,7 +271,10 @@ class AnalyticsController extends AdminController
     {
         $events = ActivityEvent::query()
             ->whereBetween('created_at', [CarbonImmutable::parse($from)->startOfDay(), CarbonImmutable::parse($to)->endOfDay()])
-            ->when($hotelId, fn (Builder $query) => is_array($hotelId) ? $query->whereIn('hotel_id', $hotelId) : $query->where('hotel_id', $hotelId))
+            ->when($hotelId, function ($query) use ($hotelId) {
+                $ids = array_map(fn($id) => is_numeric($id) ? (int) $id : $id, (array) $hotelId);
+                return $query->whereIn('hotel_id', $ids);
+            })
             ->get();
         $durations = $events->whereNotNull('duration_seconds');
 
@@ -293,7 +296,10 @@ class AnalyticsController extends AdminController
             ->where('checkin', '<', $rangeEnd->toDateString())->where('checkout', '>', $from), $request, $hotelId)->get();
         $views = ActivityEvent::query()->where('event', 'room_view')
             ->whereBetween('created_at', [$rangeStart, CarbonImmutable::parse($to)->endOfDay()])
-            ->when($hotelId, fn (Builder $query) => is_array($hotelId) ? $query->whereIn('hotel_id', $hotelId) : $query->where('hotel_id', $hotelId))
+            ->when($hotelId, function ($query) use ($hotelId) {
+                $ids = array_map(fn($id) => is_numeric($id) ? (int) $id : $id, (array) $hotelId);
+                return $query->whereIn('hotel_id', $ids);
+            })
             ->get()->groupBy(fn (ActivityEvent $event) => (string) $event->room_type_id)->map->count();
 
         $rows = $roomTypes->map(function (RoomType $roomType) use ($bookings, $rooms, $views, $rangeStart, $rangeEnd) {

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
-class PasswordResetOtp extends MongoModel
+use Illuminate\Database\Eloquent\Model;
+
+class PasswordResetOtp extends Model
 {
     protected $attributes = [
         'attempts' => 0,

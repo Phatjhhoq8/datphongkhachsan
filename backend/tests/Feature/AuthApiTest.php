@@ -101,7 +101,7 @@ class AuthApiTest extends TestCase
             'otp' => '000000',
             'password' => 'NewPassword123!',
             'password_confirmation' => 'NewPassword123!',
-        ])->assertUnprocessable()->assertJsonPath('message', 'The reset code is invalid or has expired.');
+        ])->assertUnprocessable()->assertJsonPath('message', 'Mã khôi phục mật khẩu không chính xác hoặc đã hết hạn.');
 
         $this->assertSame(1, PasswordResetOtp::query()->firstOrFail()->attempts);
     }
@@ -117,6 +117,6 @@ class AuthApiTest extends TestCase
         $this->postJson('/api/v1/auth/login', [
             'email' => 'disabled@example.com',
             'password' => 'Password123!',
-        ])->assertForbidden()->assertJsonPath('message', 'This account is disabled.');
+        ])->assertForbidden()->assertJsonPath('message', 'Tài khoản này đã bị vô hiệu hóa.');
     }
 }

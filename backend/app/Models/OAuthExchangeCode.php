@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
-class OAuthExchangeCode extends MongoModel
+use Illuminate\Database\Eloquent\Model;
+
+class OAuthExchangeCode extends Model
 {
+    protected $table = 'oauth_exchange_codes';
+
     protected $fillable = [
         'code_hash',
         'user_id',

@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Booking extends MongoModel
+class Booking extends Model
 {
     public const INVENTORY_STATUSES = ['pending', 'confirmed', 'checked_in'];
 
@@ -51,6 +52,18 @@ class Booking extends MongoModel
             'cleaning_duration_minutes_snapshot' => 'integer',
             'room_ids' => 'array',
         ];
+    }
+
+    public function getRoomIdsAttribute(): array
+    {
+        $value = $this->attributes['room_ids'] ?? null;
+        if ($value !== null) {
+            $decoded = is_string($value) ? json_decode($value, true) : $value;
+            if (is_array($decoded)) {
+                return array_map('intval', $decoded);
+            }
+        }
+        return $this->rooms()->pluck('rooms.id')->all();
     }
 
     public function rooms(): BelongsToMany

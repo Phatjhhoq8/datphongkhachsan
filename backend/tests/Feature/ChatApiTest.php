@@ -74,7 +74,7 @@ class ChatApiTest extends TestCase
             'conversation_id' => $conversationId,
             'sender_type' => 'guest',
             'text' => 'Need a late check-in',
-        ]);
+        ], 'mongodb');
         $this->assertNotNull(Conversation::query()->findOrFail($conversationId)->last_message_at);
         $event = OutboxEvent::query()->where('event_type', 'chat.message')->firstOrFail();
         $this->assertSame($messageId, $event->payload['message_id']);

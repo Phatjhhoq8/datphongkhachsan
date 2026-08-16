@@ -10,7 +10,7 @@ RUN apt-get update \
         libzip-dev \
         pkg-config \
         unzip \
-    && docker-php-ext-install -j"$(nproc)" intl mbstring zip \
+    && docker-php-ext-install -j"$(nproc)" intl mbstring zip pdo_mysql \
     && pecl install redis mongodb \
     && docker-php-ext-enable redis mongodb \
     && apt-get clean \

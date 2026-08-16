@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class BookingService extends MongoModel
+class BookingService extends Model
 {
     protected $fillable = ['booking_id', 'service_id', 'name', 'pricing_type', 'quantity', 'unit_price', 'total', 'status'];
 

@@ -29,11 +29,18 @@ class HotelBookingApiTest extends TestCase
     public function test_search_excludes_a_fully_booked_room_type_during_an_overlap(): void
     {
         $type = RoomType::query()->where('slug', 'general')->firstOrFail();
+        $hotel = $type->hotel;
+        $scheduledCheckin = CarbonImmutable::parse("{$this->checkin} {$hotel->checkin_time}", $hotel->timezone)->utc();
+        $scheduledCheckout = CarbonImmutable::parse("{$this->checkout} {$hotel->checkout_time}", $hotel->timezone)->utc();
+
         $booking = Booking::query()->create($this->bookingAttributes([
             'code' => 'DP-OVERLAP',
             'rooms_count' => 5,
             'subtotal' => 9000000,
             'total' => 9000000,
+            'hotel_id' => $type->hotel_id,
+            'scheduled_checkin_at' => $scheduledCheckin,
+            'scheduled_checkout_at' => $scheduledCheckout,
         ]));
         $roomIds = $type->rooms()->pluck('id')->all();
         $booking->update(['hotel_id' => $type->hotel_id, 'room_ids' => $roomIds]);

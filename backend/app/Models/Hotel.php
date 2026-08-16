@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Hotel extends MongoModel
+class Hotel extends Model
 {
     protected $attributes = [
         'status' => 'active',

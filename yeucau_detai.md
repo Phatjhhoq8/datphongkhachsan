@@ -74,7 +74,8 @@ Kiến trúc giữ nguyên sự mạnh mẽ của đề tài trước, áp dụn
   * **Laravel (PHP):** Làm API chính xử lý logic đặt phòng, tính toán giá, quản lý hóa đơn và tích hợp PayPal.
   * **Node.js:** Xử lý Chatbox và đồng bộ Sơ đồ phòng theo thời gian thực (để khi phòng vừa có người đặt, lập tức khóa phòng đó lại trên màn hình của khách khác, tránh lỗi Overbooking).
 * **Cơ sở dữ liệu (Database):**
-  * **MongoDB:** Là cơ sở dữ liệu duy nhất cho toàn bộ dữ liệu nghiệp vụ, bao gồm thông tin khách hàng, sơ đồ phòng, hóa đơn thanh toán, lịch đặt phòng, lịch sử chat, log tìm kiếm bằng giọng nói và tracking thời gian ở lại trang để chạy phân tích hành vi. MongoDB chạy replica set `rs0` để hỗ trợ transaction và bảo đảm tính nhất quán cho quy trình đặt phòng.
+  * **MySQL:** Lưu trữ các dữ liệu quan trọng cần tính nhất quán cao: Thông tin khách hàng, Sơ đồ phòng, Hóa đơn thanh toán, Lịch đặt phòng, Vouchers, Transactions, v.v.
+  * **MongoDB:** Lưu trữ dữ liệu chat (Conversations, Messages) và dữ liệu tracking/logs hành vi người dùng (ActivityEvents). Chạy replica set `rs0` để phục vụ các tính năng MongoDB.
   * **Redis:** Phục vụ cache, queue và outbox; không lưu dữ liệu nghiệp vụ làm nguồn dữ liệu chính.
   * **Object/File Storage:** Lưu tệp ảnh thực tế và nội dung 3D (Virtual Tour); MongoDB chỉ lưu metadata và đường dẫn tham chiếu tới tệp.
 

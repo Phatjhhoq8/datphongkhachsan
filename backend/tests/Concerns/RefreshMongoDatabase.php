@@ -15,8 +15,13 @@ trait RefreshMongoDatabase
             $this->fail("Từ chối xóa cơ sở dữ liệu MongoDB không dành cho test: {$database}");
         }
 
-        DB::connection('mongodb')->getMongoDB()->drop();
-        Artisan::call('migrate', ['--force' => true]);
+        $db = DB::connection('mongodb')->getMongoDB();
+        foreach ($db->listCollections() as $collectionInfo) {
+            $name = $collectionInfo->getName();
+            if ($name !== 'migrations') {
+                $db->selectCollection($name)->deleteMany([]);
+            }
+        }
     }
 
     public function setUpRefreshMongoDatabase(): void

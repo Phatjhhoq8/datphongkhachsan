@@ -23,7 +23,7 @@ class MongoReplicaSetTest extends TestCase
             ->command(['hello' => 1])
             ->toArray()[0];
 
-        $this->assertSame('mongodb', config('database.default'));
+        $this->assertSame('mysql', config('database.default'));
         $this->assertSame('rs0', $hello->setName ?? null);
         $this->assertTrue((bool) ($hello->isWritablePrimary ?? false));
 

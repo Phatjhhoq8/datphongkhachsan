@@ -23,6 +23,7 @@ class BookingHoldExpirationTest extends TestCase
 
     protected function setUp(): void
     {
+        CarbonImmutable::setTestNow('2026-08-15 10:00:00');
         parent::setUp();
 
         $this->seed(DatabaseSeeder::class);
@@ -121,16 +122,11 @@ class BookingHoldExpirationTest extends TestCase
 
     public function test_hold_lookup_has_compound_index_and_room_night_expiration_has_no_ttl_index(): void
     {
-        $database = DB::connection('mongodb')->getMongoDB();
-        $bookingIndexes = collect(iterator_to_array($database->selectCollection('bookings')->listIndexes()));
-        $roomNightIndexes = collect(iterator_to_array($database->selectCollection('room_nights')->listIndexes()));
-
-        $this->assertTrue($bookingIndexes->contains(
-            fn ($index) => (array) $index->getKey() === ['status' => 1, 'hold_expires_at' => 1],
-        ));
-        $this->assertFalse($roomNightIndexes->contains(
-            fn ($index) => array_key_exists('expireAfterSeconds', (array) $index),
-        ));
+        $bookingIndexes = collect(DB::select("SHOW INDEX FROM bookings"));
+        $hasIndex = $bookingIndexes->contains(
+            fn ($index) => $index->Key_name === 'bookings_status_hold_expires_at_index'
+        );
+        $this->assertTrue($hasIndex);
     }
 
     private function createBooking(string $paymentMethod, int $dayOffset, string $email, array $overrides = []): Booking

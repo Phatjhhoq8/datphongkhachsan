@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Invoice extends MongoModel
+class Invoice extends Model
 {
     protected $fillable = ['booking_id', 'number', 'subtotal', 'service_total', 'discount_total', 'total', 'paid', 'balance', 'cancellation_fee', 'refunded', 'issued_at'];
 

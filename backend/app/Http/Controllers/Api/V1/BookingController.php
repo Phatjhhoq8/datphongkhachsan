@@ -97,6 +97,7 @@ class BookingController extends Controller
                     'currency' => 'VND',
                     'voucher_id' => $voucher?->id,
                     'hotel_id' => $roomType->hotel_id,
+                    'room_ids' => $rooms->modelKeys(),
                     'source' => 'online',
                     'special_requests' => $data['special_requests'] ?? null,
                     'user_id' => $user?->id,

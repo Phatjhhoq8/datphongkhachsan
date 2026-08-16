@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class RoomNight extends MongoModel
+class RoomNight extends Model
 {
     protected $fillable = [
         'room_id',

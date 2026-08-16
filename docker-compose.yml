@@ -38,6 +38,23 @@ services:
         '
         until mongosh --quiet --host mongodb:27017 --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; do sleep 2; done
 
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    volumes:
+      - datphong_v2_mysql:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: datphong
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -71,9 +88,12 @@ services:
       FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-}
       FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
       FACEBOOK_REDIRECT_URI: ${FACEBOOK_REDIRECT_URI:-http://localhost:8000/api/v1/auth/oauth/facebook/callback}
-      LOG_CHANNEL: stderr
-      DB_CONNECTION: mongodb
-      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: datphong
+      DB_USERNAME: root
+      DB_PASSWORD: ""
       MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
@@ -83,6 +103,8 @@ services:
       QUEUE_CONNECTION: redis
       SESSION_DRIVER: redis
     depends_on:
+      mysql:
+        condition: service_healthy
       mongo-init:
         condition: service_completed_successfully
       redis:
@@ -104,10 +126,12 @@ services:
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
       APP_DEBUG: ${APP_DEBUG:-true}
-      APP_URL: ${APP_URL:-http://localhost:8000}
-      LOG_CHANNEL: stderr
-      DB_CONNECTION: mongodb
-      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: datphong
+      DB_USERNAME: root
+      DB_PASSWORD: ""
       MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
@@ -132,10 +156,12 @@ services:
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
       APP_DEBUG: ${APP_DEBUG:-true}
-      APP_URL: ${APP_URL:-http://localhost:8000}
-      LOG_CHANNEL: stderr
-      DB_CONNECTION: mongodb
-      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: datphong
+      DB_USERNAME: root
+      DB_PASSWORD: ""
       MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
@@ -159,9 +185,12 @@ services:
       APP_NAME: ${APP_NAME:-DatPhong}
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
-      APP_DEBUG: ${APP_DEBUG:-true}
-      DB_CONNECTION: mongodb
-      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: datphong
+      DB_USERNAME: root
+      DB_PASSWORD: ""
       MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
@@ -221,6 +250,8 @@ services:
         condition: service_healthy
 
 volumes:
+  datphong_v2_mysql:
+    name: datphong_v2_mysql
   datphong_v2_mongodb:
     name: datphong_v2_mongodb
   datphong_v2_public_storage:

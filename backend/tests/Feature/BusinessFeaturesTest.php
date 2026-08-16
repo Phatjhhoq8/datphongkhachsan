@@ -77,15 +77,25 @@ class BusinessFeaturesTest extends TestCase
     public function test_hotel_review_aggregates_only_use_published_reviews_and_the_frontend_field_name(): void
     {
         $hotel = $this->roomType->hotel;
+        $user = \App\Models\User::factory()->create();
+
         foreach ([['published', 4], ['rejected', 1]] as [$status, $rating]) {
+            $bookingResponse = $this->postJson('/api/v1/bookings', $this->bookingPayload([
+                'room_type_id' => $this->roomType->id,
+            ]))->assertCreated();
+            $bookingId = $bookingResponse->json('data.id');
+
             Review::query()->create([
-                'booking_id' => "aggregate-{$status}",
+                'booking_id' => $bookingId,
+                'user_id' => $user->id,
                 'hotel_id' => $hotel->id,
                 'room_type_id' => $this->roomType->id,
                 'rating_overall' => $rating,
                 'rating_room' => $rating,
                 'rating_service' => $rating,
                 'status' => $status,
+                'title' => 'Review title',
+                'content' => 'Review content',
             ]);
         }
 
@@ -119,7 +129,7 @@ class BusinessFeaturesTest extends TestCase
         ]))->assertCreated();
         $bookingId = $created->json('data.id');
 
-        $this->assertDatabaseHas('booking_services', ['booking_id' => $bookingId, 'name' => 'Airport transfer', 'unit_price' => 350000, 'total' => 350000]);
+        $this->assertDatabaseHas('booking_services', ['booking_id' => $bookingId, 'name' => $service->name, 'unit_price' => 350000, 'total' => 350000]);
         $this->assertDatabaseHas('voucher_redemptions', ['booking_id' => $bookingId, 'amount' => 215000]);
         $this->assertSame(1, Voucher::query()->where('code', 'WELCOME10')->value('used_count'));
 

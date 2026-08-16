@@ -103,7 +103,7 @@ class QuoteCalculator
         $voucher = Voucher::query()->where('normalized_code', strtoupper(trim($code)))->first();
         $now = now();
 
-        if (! $voucher || ! $voucher->active || ($voucher->hotel_id && $voucher->hotel_id !== $hotelId)
+        if (! $voucher || ! $voucher->active || ($voucher->hotel_id && (int) $voucher->hotel_id !== (int) $hotelId)
             || ($voucher->starts_at && $voucher->starts_at->isAfter($now))
             || ($voucher->ends_at && $voucher->ends_at->isBefore($now))
             || ($voucher->usage_limit !== null && $voucher->used_count >= $voucher->usage_limit)
