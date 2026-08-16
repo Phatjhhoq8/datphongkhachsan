@@ -103,8 +103,22 @@ let recognition
 
 watch(() => props.initial, (value) => Object.assign(form, value), { deep: true })
 
+const formError = ref('')
+
 function search() {
-  if (form.checkout <= form.checkin) form.checkout = addDays(form.checkin, 1)
+  formError.value = ''
+  if (form.checkout <= form.checkin) {
+    formError.value = 'Ngày trả phòng phải sau ngày nhận phòng.'
+    return
+  }
+  if (form.checkout_time) {
+    const [hours, minutes] = form.checkout_time.split(':').map(Number)
+    const checkoutMinutes = hours * 60 + minutes
+    if (checkoutMinutes > 720) {
+      formError.value = 'Giờ trả phòng đăng ký muộn nhất là 12:00 để đảm bảo thời gian dọn dẹp chuẩn bị phòng cho khách tiếp theo.'
+      return
+    }
+  }
   trackActivity('search', { metadata: { location: form.location, keyword: form.keyword, adults: form.adults } })
   router.push({ path: '/hotel/search', query: { ...form } })
 }
@@ -206,6 +220,9 @@ onBeforeUnmount(() => recognition?.abort())
     <label class="field guest-field"><span>Khách</span><span class="guest-input"><input v-model.number="form.adults" type="number" min="1" aria-label="Số người lớn" /> khách</span></label>
     <button class="voice-button" type="button" :aria-pressed="listening" :disabled="listening" @click="startVoiceSearch">{{ listening ? 'Đang nghe...' : 'Tìm bằng giọng nói' }}</button>
     <button class="primary search-button" type="submit">Tìm khách sạn</button>
+    <div v-if="formError" class="form-validation-error" role="alert">
+      ⚠️ {{ formError }}
+    </div>
     <p v-if="voiceStatus" class="voice-status" role="status">{{ voiceStatus }}</p>
     <p v-else-if="!voiceSupported" class="voice-status">Trình duyệt chưa hỗ trợ tìm kiếm bằng giọng nói.</p>
   </form>
@@ -277,5 +294,18 @@ onBeforeUnmount(() => recognition?.abort())
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+.form-validation-error {
+  grid-column: 1 / -1;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  text-align: left;
+  width: 100%;
 }
 </style>
