@@ -95,6 +95,29 @@ async function createBooking() {
 watch(() => form.hotel_id, () => { form.room_type_id = ''; form.room_id = ''; loadInventory().catch(err => { formError.value = apiError(err) }) })
 watch(() => form.room_type_id, () => { form.room_id = '' })
 onMounted(load)
+
+const showSearchDropdown = ref(false)
+
+const searchSuggestions = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  if (!query) return []
+  return bookings.value.filter(item => {
+    return [item.code, item.booking_code, item.guest_name, item.guest_phone].some(value => 
+      String(value ?? '').toLowerCase().includes(query)
+    )
+  }).slice(0, 10)
+})
+
+function selectSuggestion(item) {
+  search.value = item.guest_name
+  showSearchDropdown.value = false
+}
+
+function handleSearchBlur() {
+  setTimeout(() => {
+    showSearchDropdown.value = false
+  }, 200)
+}
 </script>
 
 <template>
@@ -102,7 +125,31 @@ onMounted(load)
     <header class="admin-page-head"><div><h1>Đặt phòng</h1><p>Danh sách đặt chỗ và nghiệp vụ lễ tân</p></div><button class="admin-button" @click="openCounterBooking">+ Đặt tại quầy</button></header>
     <div class="admin-card">
       <div class="admin-toolbar">
-        <input v-model="search" class="admin-input admin-search" type="search" placeholder="Mã đặt phòng, tên hoặc số điện thoại..." />
+        <div class="autocomplete-wrapper admin-search-wrapper">
+          <input 
+            v-model="search" 
+            class="admin-input admin-search" 
+            type="search" 
+            placeholder="Mã đặt phòng, tên hoặc số điện thoại..." 
+            @focus="showSearchDropdown = true"
+            @blur="handleSearchBlur"
+          />
+          <transition name="fade">
+            <ul v-if="showSearchDropdown && searchSuggestions.length" class="destinations-dropdown admin-search-dropdown">
+              <li 
+                v-for="item in searchSuggestions" 
+                :key="item.id"
+                class="dropdown-item"
+                @mousedown="selectSuggestion(item)"
+              >
+                <div class="dest-info">
+                  <span class="dest-name">{{ item.guest_name }}</span>
+                  <small class="dest-count">Mã: {{ item.code || item.booking_code }} - SĐT: {{ item.guest_phone }}</small>
+                </div>
+              </li>
+            </ul>
+          </transition>
+        </div>
         <select v-model="status" class="admin-select">
           <option value="">Trạng thái: Tất cả</option>
           <option value="pending">Chờ xử lý</option>
@@ -112,7 +159,6 @@ onMounted(load)
           <option value="cancelled">Đã hủy</option>
           <option value="expired">Đã hết hạn</option>
         </select>
-        <button class="admin-button secondary" @click="load">Làm mới</button>
       </div>
       <AdminState :loading="loading" :error="error" :empty="!loading&&!error&&!filtered.length" empty-text="Không tìm thấy đặt phòng." @retry="load" />
       <div v-if="!loading&&filtered.length" class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Mã</th><th>Khách hàng</th><th>Nhận / Trả</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th></th></tr></thead><tbody><tr v-for="item in filtered" :key="item.id"><td><strong>{{ item.code??item.booking_code }}</strong></td><td>{{ item.guest_name }}<br /><small>{{ item.guest_phone }}</small></td><td>{{ item.checkin??item.check_in }}<br />{{ item.checkout??item.check_out }}</td><td>{{ money(item.total??item.total_amount) }}</td><td><span class="admin-badge" :class="item.payment_status">{{ payStatusMap(item.payment_status) }}</span></td><td><span class="admin-badge" :class="item.status">{{ bookingStatusMap(item.status) }}</span></td><td><router-link class="admin-button secondary small" :to="`/admin/bookings/${item.id}`">Chi tiết</router-link></td></tr></tbody></table></div>
@@ -129,3 +175,62 @@ onMounted(load)
     </div></div><footer class="admin-modal-foot"><button class="admin-button secondary" type="button" @click="open=false">Hủy</button><button class="admin-button" :disabled="saving">{{ saving?'Đang lưu...':'Tạo đặt phòng' }}</button></footer></form></div>
   </section>
 </template>
+
+<style scoped>
+.admin-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+}
+.admin-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--admin-line);
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  z-index: 999;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.dropdown-item:hover {
+  background: #f1f5f9;
+}
+.dest-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.dest-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.dest-count {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>
