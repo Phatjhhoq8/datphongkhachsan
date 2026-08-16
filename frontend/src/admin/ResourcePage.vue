@@ -111,20 +111,43 @@ async function loadFilterOptions() {
   }))
 }
 
-function applySearch() {
-  search.value = searchTemp.value
-  filterValues.value = { ...filterValuesTemp.value }
+const showSearchDropdown = ref(false)
+
+const searchSuggestions = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  if (!query) return []
+  return items.value.filter(item => {
+    return props.columns.some(column => 
+      String(valueAt(item, column.key) ?? '').toLowerCase().includes(query)
+    )
+  }).slice(0, 10).map(item => {
+    const titleCol = props.columns[0]
+    const title = display(item, titleCol)
+    
+    const subtext = props.columns.slice(1, 4).map(col => {
+      const val = display(item, col)
+      if (val === '—' || !val) return null
+      return `${col.label}: ${val}`
+    }).filter(Boolean).join(' - ')
+    
+    return {
+      id: item.id || Math.random(),
+      title,
+      subtext,
+      item
+    }
+  })
+})
+
+function selectSuggestion(sug) {
+  search.value = sug.title
+  showSearchDropdown.value = false
 }
 
-function resetFilters() {
-  searchTemp.value = ''
-  if (props.filters) {
-    props.filters.forEach(f => {
-      filterValuesTemp.value[f.key] = ''
-    })
-  }
-  applySearch()
-  load()
+function handleSearchBlur() {
+  setTimeout(() => {
+    showSearchDropdown.value = false
+  }, 200)
 }
 
 function handleAddOption({ endpoint, option }) {
@@ -163,10 +186,99 @@ onMounted(() => {
     <header class="admin-page-head"><div><h1>{{ title }}</h1><p>{{ subtitle }}</p></div><button v-if="canCreate" class="admin-button" @click="openCreate">+ {{ createLabel }}</button></header>
     <p v-if="error && items.length" class="admin-alert">{{ error }}</p>
     <div class="admin-card">
-      <div class="admin-toolbar"><input v-model="searchTemp" @keyup.enter="applySearch" class="admin-input admin-search" type="search" placeholder="Tìm kiếm..." /><select v-for="filter in resolvedFilters" :key="filter.key" v-model="filterValuesTemp[filter.key]" class="admin-select"><option value="">{{ filter.label }}: Tất cả</option><option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option></select><button class="admin-button" @click="applySearch">Tìm kiếm</button><button class="admin-button secondary" @click="resetFilters">Làm mới</button></div>
+      <div class="admin-toolbar">
+        <div class="autocomplete-wrapper admin-search-wrapper">
+          <input 
+            v-model="search" 
+            class="admin-input admin-search" 
+            type="search" 
+            placeholder="Tìm kiếm..." 
+            @focus="showSearchDropdown = true"
+            @blur="handleSearchBlur"
+          />
+          <transition name="fade">
+            <ul v-if="showSearchDropdown && searchSuggestions.length" class="destinations-dropdown admin-search-dropdown">
+              <li 
+                v-for="sug in searchSuggestions" 
+                :key="sug.id"
+                class="dropdown-item"
+                @mousedown="selectSuggestion(sug)"
+              >
+                <div class="dest-info">
+                  <span class="dest-name">{{ sug.title }}</span>
+                  <small class="dest-count">{{ sug.subtext }}</small>
+                </div>
+              </li>
+            </ul>
+          </transition>
+        </div>
+        <select v-for="filter in resolvedFilters" :key="filter.key" v-model="filterValues[filter.key]" class="admin-select">
+          <option value="">{{ filter.label }}: Tất cả</option>
+          <option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </div>
       <AdminState :loading="loading" :error="error && !items.length ? error : ''" :empty="!loading && !error && !filtered.length" empty-text="Không tìm thấy bản ghi phù hợp." @retry="load" />
       <div v-if="!loading && filtered.length" class="admin-table-wrap"><table class="admin-table"><thead><tr><th v-for="column in columns" :key="column.key">{{ column.label }}</th><th v-if="writable">Thao tác</th></tr></thead><tbody><tr v-for="item in filtered" :key="item.id"><td v-for="column in columns" :key="column.key"><span v-if="column.format === 'status'" class="admin-badge" :class="String(valueAt(item,column.key)).toLowerCase()">{{ display(item,column) }}</span><template v-else>{{ display(item,column) }}</template></td><td v-if="writable"><div class="admin-actions"><button class="admin-button secondary small" @click="openEdit(item)">Sửa</button><button v-if="canDelete" class="admin-button danger small" @click="remove(item)">Xóa</button></div></td></tr></tbody></table></div>
     </div>
     <CrudModal :open="modalOpen" :title="editing ? `Cập nhật ${title.toLowerCase()}` : createLabel" :fields="resolvedFields" :value="editing || {}" :saving="saving" :error="formError" @close="modalOpen=false" @save="save" @add-option="handleAddOption" />
   </section>
 </template>
+
+<style scoped>
+.admin-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+}
+.admin-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--admin-line);
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  z-index: 999;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.dropdown-item:hover {
+  background: #f1f5f9;
+}
+.dest-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.dest-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.dest-count {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>
