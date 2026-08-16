@@ -185,6 +185,8 @@ class BusinessController extends Controller
             'services.*.quantity' => ['nullable', 'integer', 'between:1,100'],
             'voucher_code' => [$voucherRequired ? 'required' : 'nullable', 'string', 'max:100'],
             'guest_email' => ['nullable', 'email:rfc'],
+            'arrival_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
+            'checkout_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
         ];
     }
 

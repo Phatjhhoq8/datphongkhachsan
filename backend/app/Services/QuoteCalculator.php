@@ -10,6 +10,13 @@ use Illuminate\Validation\ValidationException;
 
 class QuoteCalculator
 {
+    protected AvailabilityService $availability;
+
+    public function __construct(AvailabilityService $availability)
+    {
+        $this->availability = $availability;
+    }
+
     public function calculate(array $data, ?string $userId = null, ?string $guestEmail = null, bool $lockVoucher = false): array
     {
         $roomType = RoomType::query()->with('hotel')->findOrFail($data['room_type_id']);
@@ -21,6 +28,17 @@ class QuoteCalculator
         
         if ($checkoutTime->lessThanOrEqualTo($checkinTime)) {
             throw ValidationException::withMessages(['checkout' => 'Checkout must be after checkin.']);
+        }
+
+        // Kiểm tra trùng lịch và phòng trống
+        $checkinParam = isset($data['arrival_time']) ? "{$data['checkin']} {$data['arrival_time']}" : $data['checkin'];
+        $checkoutParam = isset($data['checkout_time']) ? "{$data['checkout']} {$data['checkout_time']}" : $data['checkout'];
+
+        $availableRooms = $this->availability->rooms($roomType, $checkinParam, $checkoutParam);
+        if ($availableRooms->count() < $rooms) {
+            throw ValidationException::withMessages([
+                'checkin' => 'Không có phòng trống cho thời gian này do trùng lịch hoặc hết phòng.'
+            ]);
         }
 
         $nights = (int) ceil($checkinTime->diffInMinutes($checkoutTime) / 1440);
