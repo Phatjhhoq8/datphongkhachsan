@@ -227,8 +227,15 @@ onMounted(() => {
 <style scoped>
 .admin-search-wrapper {
   position: relative;
-  flex: 1;
-  min-width: 250px;
+  width: 320px;
+}
+.admin-search-wrapper input {
+  width: 100% !important;
+}
+@media (max-width: 760px) {
+  .admin-search-wrapper {
+    width: 100% !important;
+  }
 }
 .admin-search-dropdown {
   position: absolute;
