@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, apiError, responseData } from '../api'
-import { localImage, money, nights } from '../utils'
+import { localImage, money, nights, addDays, today } from '../utils'
 import PaymentMockModal from '../components/PaymentMockModal.vue'
 import PriceBreakdown from '../components/PriceBreakdown.vue'
 import ServiceSelector from '../components/ServiceSelector.vue'
@@ -36,8 +36,13 @@ function defaultArrivalTime() {
 
 const guest = reactive({ first_name: '', last_name: '', email: '', phone: '', special_requests: '', payment_method: 'pay_at_hotel', payment_option: 'full', arrival_time: route.query.arrival_time || defaultArrivalTime(), checkout_time: route.query.checkout_time || '12:00' })
 
-const checkin = computed(() => seedQuote.value?.checkin ?? route.query.checkin)
-const checkout = computed(() => seedQuote.value?.checkout ?? route.query.checkout)
+const checkin = ref(route.query.checkin || addDays(today(), 1))
+const checkout = ref(route.query.checkout || addDays(today(), 2))
+watch(checkin, (newVal) => {
+  if (checkout.value <= newVal) {
+    checkout.value = addDays(newVal, 1)
+  }
+})
 const roomTypeId = computed(() => seedQuote.value?.room?.id ?? route.query.room_type_id)
 const roomCount = computed(() => Number(seedQuote.value?.rooms ?? route.query.rooms ?? 1))
 const stayNights = computed(() => nights(checkin.value, checkout.value))
@@ -106,6 +111,10 @@ async function loadCheckout() {
     guest.phone = auth.user.phone ?? auth.user.phone_number ?? ''
   }
   loadStoredQuote()
+  if (seedQuote.value) {
+    checkin.value = seedQuote.value.checkin ?? route.query.checkin ?? checkin.value
+    checkout.value = seedQuote.value.checkout ?? route.query.checkout ?? checkout.value
+  }
   if ((!seedQuote.value?.room || String(seedQuote.value.room.id) !== String(route.query.room_type_id)) && route.query.hotel_slug) {
     try {
       const hotel = responseData(await api.get(`/hotels/${route.query.hotel_slug}`, { params: route.query }))
@@ -177,7 +186,7 @@ async function confirmMockPayment(cardData) {
 }
 
 let quoteTimer
-watch([selectedServices, () => guest.payment_option], () => { if (!loading.value) { clearTimeout(quoteTimer); quoteTimer = setTimeout(() => requestQuote(), 250) } }, { deep: true })
+watch([selectedServices, () => guest.payment_option, checkin, checkout], () => { if (!loading.value) { clearTimeout(quoteTimer); quoteTimer = setTimeout(() => requestQuote(), 250) } }, { deep: true })
 onMounted(loadCheckout)
 </script>
 
@@ -196,13 +205,15 @@ onMounted(loadCheckout)
         <p v-if="error" class="form-error" role="alert">{{ error }}</p><button class="primary submit-booking" :disabled="submitting || quoting || !quote" type="submit">{{ submitting ? 'Đang giữ phòng...' : isOnline ? `Đặt phòng và thanh toán ${money(amountDue)}` : 'Xác nhận đặt phòng' }}</button><p class="terms">Bằng việc xác nhận, bạn đồng ý với chính sách đặt và hủy phòng của nơi nghỉ.</p>
       </form>
     </section>
-    <aside v-if="seedQuote" class="booking-summary"><img :src="localImage(seedQuote.room?.image ?? seedQuote.room?.images?.[0]?.url ?? seedQuote.hotel?.hero_image, seedQuote.room?.id)" :alt="seedQuote.hotel?.name" /><div class="summary-content"><span v-if="seedQuote.hotel?.star_rating" class="stars">{{ '★'.repeat(Number(seedQuote.hotel.star_rating)) }}</span><h2>{{ seedQuote.hotel?.name }}</h2><p>{{ seedQuote.hotel?.address }}</p><hr /><h3>{{ seedQuote.room?.name }}</h3><div class="stay-dates"><span><small>Nhận phòng</small><strong>{{ checkin }}</strong></span><span><small>Trả phòng</small><strong>{{ checkout }}</strong></span></div><p>{{ stayNights }} đêm · {{ roomCount }} phòng · {{ seedQuote.adults ?? route.query.adults ?? 2 }} khách</p><hr /><PriceBreakdown v-if="quote" :quote="quote" :amount-due="amountDue" /><div v-if="quoting" class="recalculating"><span class="mini-spinner"></span> Đang cập nhật giá...</div><small>Giá cuối cùng do máy chủ tính, đã gồm các khoản được thể hiện trong báo giá.</small></div></aside>
+    <aside v-if="seedQuote" class="booking-summary"><img :src="localImage(seedQuote.room?.image ?? seedQuote.room?.images?.[0]?.url ?? seedQuote.hotel?.hero_image, seedQuote.room?.id)" :alt="seedQuote.hotel?.name" /><div class="summary-content"><span v-if="seedQuote.hotel?.star_rating" class="stars">{{ '★'.repeat(Number(seedQuote.hotel.star_rating)) }}</span><h2>{{ seedQuote.hotel?.name }}</h2><p>{{ seedQuote.hotel?.address }}</p><hr /><h3>{{ seedQuote.room?.name }}</h3><div class="stay-dates"><span><small>Nhận phòng</small><input type="date" v-model="checkin" :min="today()" class="inline-date-input" /></span><span><small>Trả phòng</small><input type="date" v-model="checkout" :min="addDays(checkin, 1)" class="inline-date-input" /></span></div><p>{{ stayNights }} đêm · {{ roomCount }} phòng · {{ seedQuote.adults ?? route.query.adults ?? 2 }} khách</p><hr /><PriceBreakdown v-if="quote" :quote="quote" :amount-due="amountDue" /><div v-if="quoting" class="recalculating"><span class="mini-spinner"></span> Đang cập nhật giá...</div><small>Giá cuối cùng do máy chủ tính, đã gồm các khoản được thể hiện trong báo giá.</small></div></aside>
   </div>
   <PaymentMockModal :open="paymentModal" :method="modalMethod" :amount="amountDue" :booking-code="bookingCode" :processing="paymentProcessing" :error="paymentError" @close="paymentModal = false" @confirm="confirmMockPayment" />
 </template>
 
 <style scoped>
 .payment-split,.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.payment-split label,.method-grid label{display:flex;align-items:center;gap:10px;border:1px solid #dce3ea;border-radius:9px;padding:13px;cursor:pointer}.payment-split label:has(input:checked),.method-grid label.selected{border-color:#0877cc;background:#f1f8fd}.payment-split input,.method-grid input{width:auto;accent-color:#0877cc}.payment-split strong,.payment-split small,.method-grid strong,.method-grid small{display:block}.payment-split small,.method-grid small{color:#637083;font-size:10px}.method-grid label>b{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:#e9f5fd;color:#0877cc;font-size:17px}.payment-preview{margin-top:14px;border:1px solid #dce3ea;border-radius:14px;background:#f8fbfe;padding:15px}.preview-card{overflow:hidden;position:relative;border-radius:16px;padding:18px;color:#fff;background:linear-gradient(135deg,#111827,#1e1b4b 60%,#0877cc);box-shadow:0 12px 28px #13243a18}.preview-card div{display:flex;justify-content:space-between;font-size:10px;font-weight:900;letter-spacing:1px}.preview-card strong{display:block;margin:28px 0 10px;font-size:18px;letter-spacing:2px}.preview-card small{color:#dbeafe}.preview-qr,.preview-paypal{display:flex;align-items:center;gap:15px}.preview-qr img{width:118px;height:118px;object-fit:contain;background:#fff;border:1px solid #e1e7ed;border-radius:12px;padding:6px}.preview-qr strong,.preview-qr span,.preview-paypal strong{display:block}.preview-qr span{color:#0877cc;font-size:18px;font-weight:900}.preview-qr small,.preview-paypal small{display:block;color:#637083;margin-top:5px}.preview-paypal>b{flex:0 0 auto;color:#003087;font-size:32px;font-weight:900}.preview-paypal>b span{color:#179bd7}.recalculating{display:flex;align-items:center;gap:7px;color:#0877cc;font-size:11px;margin:12px 0}.mini-spinner{width:14px;height:14px;border:2px solid #d8eaf7;border-top-color:#0877cc;border-radius:50%;animation:spin .7s linear infinite}
+.inline-date-input { border: 1px dashed #0877cc; border-radius: 6px; padding: 4px 8px; font-family: inherit; font-size: 13.5px; font-weight: 700; color: #0877cc; background: #f1f8fd; outline: none; cursor: pointer; transition: all 0.2s ease; margin-top: 2px; }
+.inline-date-input:focus { border-style: solid; border-color: #003087; background: #fff; }
 .two-columns label.full-width { grid-column: span 2; }
 .two-columns label.full-width input { width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px; background-color: #fff; font-size: 13.5px; color: #13243a; font-weight: 500; cursor: pointer; outline: none; transition: border-color 0.2s ease; }
 .two-columns label.full-width input:focus { border-color: #0877cc; }
