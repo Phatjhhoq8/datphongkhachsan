@@ -18,7 +18,7 @@ class RoomController extends AdminController
     public function index(Request $request): AnonymousResourceCollection
     {
         $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
-        $rooms = Room::query()->with('roomType')->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))
+        $rooms = Room::query()->with(['roomType', 'hotel'])->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))
             ->when($request->filled('floor'), fn ($query) => $query->where('floor', $request->integer('floor')))
             ->orderBy('room_number')->paginate($request->integer('per_page', 50));
 
@@ -30,14 +30,14 @@ class RoomController extends AdminController
         $data = $request->validated();
         $this->scopedHotelId($request, (string) $data['hotel_id']);
 
-        return new RoomResource(Room::query()->create($data)->load('roomType'));
+        return new RoomResource(Room::query()->create($data)->load(['roomType', 'hotel']));
     }
 
     public function show(Request $request, Room $room): RoomResource
     {
         $this->scopedHotelId($request, $room->hotel_id);
 
-        return new RoomResource($room->load('roomType'));
+        return new RoomResource($room->load(['roomType', 'hotel']));
     }
 
     public function update(RoomRequest $request, Room $room): RoomResource
@@ -46,7 +46,7 @@ class RoomController extends AdminController
         $this->scopedHotelId($request, $room->hotel_id);
         $this->scopedHotelId($request, (string) $data['hotel_id']);
         $room->update($data);
-        $this->recordRoomUpdate($room->refresh()->load('roomType'));
+        $this->recordRoomUpdate($room->refresh()->load(['roomType', 'hotel']));
 
         return new RoomResource($room);
     }
@@ -86,7 +86,7 @@ class RoomController extends AdminController
                 'operational_status' => 'available',
                 'cleaning_completed_at' => now(),
             ]);
-            $this->recordRoomUpdate($room->refresh()->load('roomType'));
+            $this->recordRoomUpdate($room->refresh()->load(['roomType', 'hotel']));
         });
 
         return new RoomResource($room);
