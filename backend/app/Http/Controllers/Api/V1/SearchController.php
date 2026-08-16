@@ -22,9 +22,10 @@ class SearchController extends Controller
         $requestedAmenities = $data['amenities'] ?? [];
         $requestedTypes = array_map('mb_strtolower', $data['room_type'] ?? []);
         $keyword = mb_strtolower((string) ($data['keyword'] ?? ''));
+        $stars = array_map('intval', $data['stars'] ?? []);
 
         $results = RoomType::query()->where('active', true)->with(['hotel.approvedReviews', 'images', 'amenities'])->get()
-            ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $availability): bool {
+            ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $stars, $availability): bool {
                 $timeToMinutes = function (string $time): int {
                     list($hours, $minutes) = explode(':', $time);
                     return ((int) $hours * 60) + (int) $minutes;
@@ -65,7 +66,7 @@ class SearchController extends Controller
                     && ($requestedTypes === [] || collect($requestedTypes)->contains(fn ($type) => str_contains($typeText, $type)))
                     && ($keyword === '' || str_contains($typeText, $keyword))
                     && (! ($data['refundable'] ?? false) || $roomType->refundable)
-                    && (empty($data['stars']) || in_array($roomType->hotel?->star_rating, $data['stars'], true));
+                    && (empty($stars) || in_array((int) $roomType->hotel?->star_rating, $stars, true));
             })
             ->each(function (RoomType $roomType) use ($nights, $rooms) {
                 if ($roomType->hotel) {
