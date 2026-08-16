@@ -200,4 +200,74 @@ class AdminRoomTurnoverTest extends TestCase
 
         return $booking;
     }
+
+    public function test_custom_checkout_time_validation_and_late_checkout_fee(): void
+    {
+        $type = $this->roomType;
+        
+        $this->postJson('/api/v1/bookings', [
+            'room_type_id' => $type->id,
+            'guest_name' => 'Late Guest',
+            'guest_email' => 'late@example.com',
+            'guest_phone' => '0901234567',
+            'checkin' => CarbonImmutable::tomorrow()->toDateString(),
+            'checkout' => CarbonImmutable::tomorrow()->addDay()->toDateString(),
+            'rooms' => 1,
+            'adults' => 2,
+            'payment_method' => 'pay_at_hotel',
+            'checkout_time' => '13:00',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['checkout_time']);
+
+        $response = $this->postJson('/api/v1/bookings', [
+            'room_type_id' => $type->id,
+            'guest_name' => 'Late Guest',
+            'guest_email' => 'late@example.com',
+            'guest_phone' => '0901234567',
+            'checkin' => CarbonImmutable::tomorrow()->toDateString(),
+            'checkout' => CarbonImmutable::tomorrow()->addDay()->toDateString(),
+            'rooms' => 1,
+            'adults' => 2,
+            'payment_method' => 'pay_at_hotel',
+            'checkout_time' => '12:00',
+        ])->assertCreated();
+
+        $bookingId = $response->json('data.id');
+        $booking = Booking::query()->findOrFail($bookingId);
+        
+        $booking->update([
+            'status' => 'checked_in',
+            'checked_in_at' => now(),
+            'scheduled_checkout_at' => CarbonImmutable::now()->subMinutes(55),
+            'late_checkout_grace_minutes_snapshot' => 30,
+        ]);
+        
+        $booking->invoice()->create([
+            'number' => 'INV-' . $booking->code,
+            'hotel_id' => $booking->hotel_id,
+            'customer_name' => $booking->guest_name,
+            'customer_email' => $booking->guest_email,
+            'room_total' => $booking->subtotal,
+            'service_total' => 0,
+            'discount_total' => 0,
+            'total' => $booking->total,
+            'paid_amount' => 0,
+            'balance' => $booking->total,
+            'status' => 'unpaid',
+        ]);
+        
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        $this->actingAs($admin);
+        
+        $this->postJson("/api/v1/admin/bookings/{$booking->id}/check-out")->assertOk();
+        
+        $booking->refresh();
+        
+        $this->assertSame(1100000.0, (float) $booking->total);
+        $this->assertSame(100000.0, (float) $booking->service_total);
+        $this->assertSame(1100000.0, (float) $booking->invoice->total);
+        $this->assertSame(100000.0, (float) $booking->invoice->service_total);
+        $this->assertSame(1100000.0, (float) $booking->invoice->balance);
+        
+        $this->assertStringContainsString('Charged late checkout fee of 100,000 VND', $booking->statusHistories()->orderByDesc('id')->first()->reason);
+    }
 }

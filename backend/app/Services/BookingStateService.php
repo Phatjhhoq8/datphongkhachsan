@@ -60,6 +60,39 @@ class BookingStateService
             } elseif ($status === 'checked_out') {
                 $checkedOutAt = now();
                 $attributes['checked_out_at'] = $checkedOutAt;
+
+                $hotel = \App\Models\Hotel::query()->findOrFail($booking->hotel_id);
+                $scheduledCheckout = $booking->scheduled_checkout_at
+                    ? \Carbon\CarbonImmutable::instance($booking->scheduled_checkout_at)->utc()
+                    : \Carbon\CarbonImmutable::parse("{$booking->checkout->toDateString()} {$hotel->checkout_time}", $hotel->timezone)->utc();
+                
+                $grace = (int) ($booking->late_checkout_grace_minutes_snapshot ?? $hotel->late_checkout_grace_minutes);
+                $graceCheckoutTime = $scheduledCheckout->addMinutes($grace);
+                $actualCheckoutUtc = $checkedOutAt->utc();
+                
+                if ($actualCheckoutUtc->gt($graceCheckoutTime)) {
+                    $lateMinutes = abs($actualCheckoutUtc->diffInMinutes($scheduledCheckout));
+                    $lateHours = (int) ceil($lateMinutes / 60);
+                    
+                    $pricePerNight = $booking->nights > 0 ? ((float) $booking->subtotal / $booking->nights) : 0;
+                    $lateFeePerHour = round($pricePerNight * 0.1);
+                    $totalLateFee = $lateHours * $lateFeePerHour;
+                    
+                    if ($totalLateFee > 0) {
+                        $booking->increment('total', $totalLateFee);
+                        $booking->increment('service_total', $totalLateFee);
+                        
+                        $invoice = $booking->invoice;
+                        if ($invoice) {
+                            $invoice->increment('service_total', $totalLateFee);
+                            $invoice->increment('total', $totalLateFee);
+                            $invoice->increment('balance', $totalLateFee);
+                        }
+                        
+                        $reason = ($reason ? $reason . ". " : "") . "Checked out late by {$lateMinutes} minutes. Charged late checkout fee of " . number_format($totalLateFee) . " VND.";
+                    }
+                }
+
                 Room::query()->whereIn('id', $booking->room_ids ?? [])->update([
                     'operational_status' => 'cleaning',
                     'cleaning_started_at' => $checkedOutAt,

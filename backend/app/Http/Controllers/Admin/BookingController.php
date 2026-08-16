@@ -93,7 +93,7 @@ class BookingController extends AdminController
 
             $nights = CarbonImmutable::parse($data['checkin'])->diffInDays($data['checkout']);
             $total = (string) ((float) $roomType->price_per_night * $nights * $count);
-            $turnoverSnapshot = $this->turnover->bookingSnapshot($hotel, $data['checkin'], $data['checkout']);
+            $turnoverSnapshot = $this->turnover->bookingSnapshot($hotel, $data['checkin'], $data['checkout'], $data['arrival_time'] ?? null, $data['checkout_time'] ?? null);
             $booking = Booking::query()->create([
                 'code' => $this->newCode(),
                 'guest_name' => $data['guest_name'], 'guest_email' => strtolower($data['guest_email']), 'guest_phone' => $data['guest_phone'],

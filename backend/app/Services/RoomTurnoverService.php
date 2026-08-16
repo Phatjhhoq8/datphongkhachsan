@@ -9,12 +9,13 @@ use Carbon\CarbonInterface;
 
 class RoomTurnoverService
 {
-    public function bookingSnapshot(Hotel $hotel, string $checkin, string $checkout, ?string $arrivalTime = null): array
+    public function bookingSnapshot(Hotel $hotel, string $checkin, string $checkout, ?string $arrivalTime = null, ?string $checkoutTime = null): array
     {
         $time = $arrivalTime ?: $hotel->checkin_time;
+        $outTime = $checkoutTime ?: $hotel->checkout_time;
         return [
             'scheduled_checkin_at' => $this->hotelTime($checkin, $time, $hotel->timezone),
-            'scheduled_checkout_at' => $this->hotelTime($checkout, $hotel->checkout_time, $hotel->timezone),
+            'scheduled_checkout_at' => $this->hotelTime($checkout, $outTime, $hotel->timezone),
             'late_checkout_grace_minutes_snapshot' => (int) $hotel->late_checkout_grace_minutes,
             'cleaning_duration_minutes_snapshot' => (int) $hotel->cleaning_duration_minutes,
         ];

@@ -71,7 +71,7 @@ class BookingController extends Controller
                 $onlinePayment = in_array($data['payment_method'], ['paypal', 'paypal_mock', 'card_mock', 'vietqr_mock'], true);
                 $holdExpiresAt = $onlinePayment ? now()->addMinutes(15) : null;
 
-                $turnoverSnapshot = $turnover->bookingSnapshot($hotel, $data['checkin'], $data['checkout'], $data['arrival_time'] ?? null);
+                $turnoverSnapshot = $turnover->bookingSnapshot($hotel, $data['checkin'], $data['checkout'], $data['arrival_time'] ?? null, $data['checkout_time'] ?? null);
                 $booking = Booking::query()->create([
                     'code' => $this->newCode(),
                     'idempotency_key' => $key,
