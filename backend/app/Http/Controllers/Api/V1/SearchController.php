@@ -18,14 +18,31 @@ class SearchController extends Controller
         $children = (int) ($data['children'] ?? 0);
         $nights = CarbonImmutable::parse($data['checkin'])->diffInDays($data['checkout']);
 
-        $location = mb_strtolower((string) ($data['location'] ?? ''));
+        $stripAccents = function (string $str): string {
+            $dict = [
+                'a' => ['à','á','ạ','ả','ã','â','ầ','ấ','ậ','ẩ','ẫ','ă','ằ','ắ','ặ','ẳ','ẵ','A','À','Á','Ạ','Ả','Ã','Â','Ầ','Ấ','Ậ','Ẩ','Ẫ','Ă','Ằ','Ắ','Ặ','Ẳ','Ẵ'],
+                'e' => ['è','é','ẹ','ẻ','ẽ','ê','ề','ế','ệ','ể','ễ','E','È','É','Ẹ','Ẻ','Ẽ','Ê','Ề','Ế','Ệ','Ể','Ễ'],
+                'i' => ['ì','í','ị','ỉ','ĩ','I','Ì','Í','Ị','Ỉ','Ĩ'],
+                'o' => ['ò','ó','ọ','ỏ','õ','ô','ồ','ố','ộ','ổ','ỗ','ơ','ờ','ớ','ợ','ở','ỡ','O','Ò','Ó','Ọ','Ỏ','Õ','Ô','Ồ','Ố','Ộ','Ổ','Ỗ','Ơ','Ờ','Ớ','Ợ','Ở','Ỡ'],
+                'u' => ['ù','ú','ụ','ủ','ũ','ư','ừ','ứ','ự','ử','ữ','U','Ù','Ú','Ụ','Ủ','Ũ','Ư','Ừ','Ứ','Ự','Ử','Ữ'],
+                'y' => ['ỳ','ý','ỵ','ỷ','ỹ','Y','Ỳ','Ý','Ỵ','Ỷ','Ỹ'],
+                'd' => ['đ','Đ']
+            ];
+            $str = mb_strtolower($str);
+            foreach ($dict as $replacement => $accents) {
+                $str = str_replace($accents, $replacement, $str);
+            }
+            return $str;
+        };
+
+        $location = $stripAccents((string) ($data['location'] ?? ''));
         $requestedAmenities = $data['amenities'] ?? [];
         $requestedTypes = array_map('mb_strtolower', $data['room_type'] ?? []);
-        $keyword = mb_strtolower((string) ($data['keyword'] ?? ''));
+        $keyword = $stripAccents((string) ($data['keyword'] ?? ''));
         $stars = array_map('intval', $data['stars'] ?? []);
 
         $results = RoomType::query()->where('active', true)->with(['hotel.approvedReviews', 'images', 'amenities'])->get()
-            ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $stars, $availability): bool {
+            ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $stars, $availability, $stripAccents): bool {
                 $timeToMinutes = function (string $time): int {
                     list($hours, $minutes) = explode(':', $time);
                     return ((int) $hours * 60) + (int) $minutes;
@@ -52,9 +69,9 @@ class SearchController extends Controller
                 $checkoutParam = isset($data['checkout_time']) ? "{$data['checkout']} {$data['checkout_time']}" : $data['checkout'];
                 $available = $availability->rooms($roomType, $checkinParam, $checkoutParam)->count();
                 $roomType->setAttribute('available_rooms', $available);
-                $hotelText = mb_strtolower(implode(' ', [$roomType->hotel?->city, $roomType->hotel?->name, $roomType->hotel?->address]));
+                $hotelText = $stripAccents(implode(' ', [$roomType->hotel?->city, $roomType->hotel?->name, $roomType->hotel?->address]));
                 $amenitySlugs = $roomType->amenities->pluck('slug')->all();
-                $typeText = mb_strtolower("{$roomType->slug} {$roomType->name}");
+                $typeText = $stripAccents("{$roomType->slug} {$roomType->name}");
 
                 return $available >= $rooms
                     && $roomType->max_adults >= (int) ceil($data['adults'] / $rooms)

@@ -46,9 +46,25 @@ class HotelController extends Controller
             ->get();
 
         if ($request->filled('location')) {
-            $needle = mb_strtolower((string) $request->string('location')->trim());
+            $stripAccents = function (string $str): string {
+                $dict = [
+                    'a' => ['à','á','ạ','ả','ã','â','ầ','ấ','ậ','ẩ','ẫ','ă','ằ','ắ','ặ','ẳ','ẵ','A','À','Á','Ạ','Ả','Ã','Â','Ầ','Ấ','Ậ','Ẩ','Ẫ','Ă','Ằ','Ắ','Ặ','Ẳ','Ẵ'],
+                    'e' => ['è','é','ẹ','ẻ','ẽ','ê','ề','ế','ệ','ể','ễ','E','È','É','Ẹ','Ẻ','Ẽ','Ê','Ề','Ế','Ệ','Ể','Ễ'],
+                    'i' => ['ì','í','ị','ỉ','ĩ','I','Ì','Í','Ị','Ỉ','Ĩ'],
+                    'o' => ['ò','ó','ọ','ỏ','õ','ô','ồ','ố','ộ','ổ','ỗ','ơ','ờ','ớ','ợ','ở','ỡ','O','Ò','Ó','Ọ','Ỏ','Õ','Ô','Ồ','Ố','Ộ','Ổ','Ỗ','Ơ','Ờ','Ớ','Ợ','Ở','Ỡ'],
+                    'u' => ['ù','ú','ụ','ủ','ũ','ư','ừ','ứ','ự','ử','ữ','U','Ù','Ú','Ụ','Ủ','Ũ','Ư','Ừ','Ứ','Ự','Ử','Ữ'],
+                    'y' => ['ỳ','ý','ỵ','ỷ','ỹ','Y','Ỳ','Ý','Ỵ','Ỷ','Ỹ'],
+                    'd' => ['đ','Đ']
+                ];
+                $str = mb_strtolower($str);
+                foreach ($dict as $replacement => $accents) {
+                    $str = str_replace($accents, $replacement, $str);
+                }
+                return $str;
+            };
+            $needle = $stripAccents((string) $request->string('location')->trim());
             $hotels = $hotels->filter(fn (Hotel $hotel) => collect([$hotel->city, $hotel->name, $hotel->address])
-                ->contains(fn ($value) => str_contains(mb_strtolower((string) $value), $needle)))->values();
+                ->contains(fn ($value) => str_contains($stripAccents((string) $value), $needle)))->values();
         }
 
         $hotels->each(function (Hotel $hotel) use ($availability): void {
