@@ -17,7 +17,7 @@ class VoucherController extends AdminController
 
         $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
 
-        return response()->json(['data' => Voucher::query()->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->latest()->get()]);
+        return response()->json(['data' => Voucher::query()->with('hotel')->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->latest()->get()]);
     }
 
     public function store(Request $request): JsonResponse
@@ -26,14 +26,14 @@ class VoucherController extends AdminController
         $this->scopedHotelId($request, isset($data['hotel_id']) ? (string) $data['hotel_id'] : null);
         $data['normalized_code'] = strtoupper(trim($data['code']));
 
-        return response()->json(['data' => Voucher::query()->create($data)], 201);
+        return response()->json(['data' => Voucher::query()->create($data)->load('hotel')], 201);
     }
 
     public function show(Request $request, Voucher $voucher): JsonResponse
     {
         $this->scopedHotelId($request, $voucher->hotel_id);
 
-        return response()->json(['data' => $voucher]);
+        return response()->json(['data' => $voucher->load('hotel')]);
     }
 
     public function update(Request $request, Voucher $voucher): JsonResponse
@@ -44,7 +44,7 @@ class VoucherController extends AdminController
         $data['normalized_code'] = strtoupper(trim($data['code']));
         $voucher->update($data);
 
-        return response()->json(['data' => $voucher->refresh()]);
+        return response()->json(['data' => $voucher->refresh()->load('hotel')]);
     }
 
     public function destroy(Request $request, Voucher $voucher): Response

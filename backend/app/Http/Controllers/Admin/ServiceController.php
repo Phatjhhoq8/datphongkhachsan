@@ -14,7 +14,7 @@ class ServiceController extends AdminController
     {
         $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
 
-        return response()->json(['data' => Service::query()->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->orderBy('name')->get()]);
+        return response()->json(['data' => Service::query()->with('hotel')->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->orderBy('name')->get()]);
     }
 
     public function store(Request $request): JsonResponse
@@ -22,14 +22,14 @@ class ServiceController extends AdminController
         $data = $this->validated($request);
         $this->scopedHotelId($request, (string) $data['hotel_id']);
 
-        return response()->json(['data' => Service::query()->create($data)], 201);
+        return response()->json(['data' => Service::query()->create($data)->load('hotel')], 201);
     }
 
     public function show(Request $request, Service $service): JsonResponse
     {
         $this->scopedHotelId($request, $service->hotel_id);
 
-        return response()->json(['data' => $service]);
+        return response()->json(['data' => $service->load('hotel')]);
     }
 
     public function update(Request $request, Service $service): JsonResponse
@@ -39,7 +39,7 @@ class ServiceController extends AdminController
         $this->scopedHotelId($request, (string) $data['hotel_id']);
         $service->update($data);
 
-        return response()->json(['data' => $service->refresh()]);
+        return response()->json(['data' => $service->refresh()->load('hotel')]);
     }
 
     public function destroy(Request $request, Service $service): Response
