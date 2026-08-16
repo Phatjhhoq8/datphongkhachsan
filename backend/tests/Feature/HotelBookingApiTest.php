@@ -3,15 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
+use App\Models\RoomNight;
 use App\Models\RoomType;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\RefreshMongoDatabase;
 use Tests\TestCase;
 
 class HotelBookingApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshMongoDatabase;
 
     private string $checkin;
 
@@ -34,7 +35,16 @@ class HotelBookingApiTest extends TestCase
             'subtotal' => 9000000,
             'total' => 9000000,
         ]));
-        $booking->rooms()->attach($type->rooms()->pluck('id'));
+        $roomIds = $type->rooms()->pluck('id')->all();
+        $booking->update(['hotel_id' => $type->hotel_id, 'room_ids' => $roomIds]);
+        foreach ($roomIds as $roomId) {
+            foreach ([$this->checkin, CarbonImmutable::parse($this->checkin)->addDay()->toDateString()] as $night) {
+                RoomNight::query()->create([
+                    'room_id' => $roomId, 'booking_id' => $booking->id, 'hotel_id' => $type->hotel_id,
+                    'room_type_id' => $type->id, 'night' => $night, 'state' => 'booked',
+                ]);
+            }
+        }
 
         $response = $this->getJson('/api/v1/search?'.http_build_query([
             'location' => 'Đà Lạt',
@@ -77,8 +87,9 @@ class HotelBookingApiTest extends TestCase
             ->assertJsonPath('data.nights', 2)
             ->assertJsonPath('data.subtotal', '1800000.00')
             ->assertJsonPath('data.total', '1800000.00')
-            ->assertJsonPath('data.payment_status', 'pending');
-        $this->assertDatabaseHas('booking_room', ['booking_id' => $response->json('data.id')]);
+            ->assertJsonPath('data.payment_status', 'pending')
+            ->assertJsonPath('data.source', 'online');
+        $this->assertDatabaseHas('room_nights', ['booking_id' => $response->json('data.id')]);
     }
 
     public function test_booking_returns_conflict_when_inventory_is_insufficient(): void
@@ -102,7 +113,7 @@ class HotelBookingApiTest extends TestCase
 
         $this->assertSame($first->json('data.code'), $second->json('data.code'));
         $this->assertDatabaseCount('bookings', 1);
-        $this->assertDatabaseCount('booking_room', 1);
+        $this->assertDatabaseCount('room_nights', 2);
     }
 
     public function test_booking_detail_requires_matching_email_and_cancel_releases_inventory(): void
@@ -130,7 +141,7 @@ class HotelBookingApiTest extends TestCase
         ]))->assertOk()->assertJsonFragment(['slug' => 'general', 'available_rooms' => 5]);
     }
 
-    private function requestPayload(int $roomTypeId, array $overrides = []): array
+    private function requestPayload(string $roomTypeId, array $overrides = []): array
     {
         return array_merge([
             'room_type_id' => $roomTypeId,

@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\PaymentTransaction;
 use App\Models\Review;
+use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\Voucher;
 use App\Models\Wishlist;
@@ -36,14 +37,18 @@ class BusinessController extends Controller
 
     public function vouchers(): JsonResponse
     {
+        // Tự động xóa các voucher đã hết hạn khỏi database
+        Voucher::query()->whereNotNull('ends_at')->where('ends_at', '<', now())->delete();
+
         $vouchers = Voucher::query()
             ->with('hotel:id,slug,name,city')
             ->where('active', true)
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
-            ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit'))
             ->orderBy('ends_at')
-            ->get();
+            ->get()
+            ->filter(fn (Voucher $voucher) => $voucher->usage_limit === null || $voucher->used_count < $voucher->usage_limit)
+            ->values();
 
         return response()->json(['data' => $vouchers]);
     }
@@ -108,7 +113,7 @@ class BusinessController extends Controller
 
     public function wishlistStore(Request $request): JsonResponse
     {
-        $data = Validator::make($request->all(), ['room_type_id' => ['required', 'integer', 'exists:room_types,id']])->validate();
+        $data = Validator::make($request->all(), ['room_type_id' => ['required', 'string', 'exists:room_types,id']])->validate();
         $item = Wishlist::query()->firstOrCreate(['user_id' => $request->user()->id, 'room_type_id' => $data['room_type_id']]);
 
         return response()->json(['data' => $item], $item->wasRecentlyCreated ? 201 : 200);
@@ -130,7 +135,7 @@ class BusinessController extends Controller
     {
         $data = Validator::make($request->all(), [
             'booking_code' => ['required', 'string', 'exists:bookings,code'],
-            'room_type_id' => ['required', 'integer', 'exists:room_types,id'],
+            'room_type_id' => ['required', 'string', 'exists:room_types,id'],
             'rating_overall' => ['required', 'integer', 'between:1,5'],
             'rating_room' => ['required', 'integer', 'between:1,5'],
             'rating_service' => ['required', 'integer', 'between:1,5'],
@@ -140,7 +145,7 @@ class BusinessController extends Controller
         $booking = Booking::query()->where('code', $data['booking_code'])->firstOrFail();
         abort_unless($booking->created_by === $request->user()->id && $booking->status === 'checked_out', 403, 'Only the owner of a checked-out booking may review it.');
         $roomType = RoomType::query()->findOrFail($data['room_type_id']);
-        abort_unless($booking->rooms()->where('room_type_id', $roomType->id)->exists(), 422, 'Room type does not belong to this booking.');
+        abort_unless(Room::query()->whereIn('_id', $booking->room_ids ?? [])->where('room_type_id', $roomType->id)->exists(), 422, 'Room type does not belong to this booking.');
 
         $review = Review::query()->create($data + [
             'booking_id' => $booking->id,
@@ -167,16 +172,16 @@ class BusinessController extends Controller
     private function quoteRules(bool $voucherRequired = false): array
     {
         return [
-            'room_type_id' => ['required', 'integer', 'exists:room_types,id'],
-            'checkin' => ['required', 'date_format:Y-m-d'],
-            'checkout' => ['required', 'date_format:Y-m-d', 'after:checkin'],
+            'room_type_id' => ['required', 'string', 'exists:room_types,id'],
+            'checkin' => ['required', 'date'],
+            'checkout' => ['required', 'date', 'after:checkin'],
             'rooms' => ['required', 'integer', 'between:1,20'],
             'adults' => ['required', 'integer', 'between:1,100'],
             'children' => ['nullable', 'integer', 'between:0,100'],
             'service_ids' => ['nullable', 'array'],
-            'service_ids.*' => ['integer', 'distinct'],
+            'service_ids.*' => ['string', 'distinct'],
             'services' => ['nullable', 'array'],
-            'services.*.id' => ['required', 'integer'],
+            'services.*.id' => ['required', 'string'],
             'services.*.quantity' => ['nullable', 'integer', 'between:1,100'],
             'voucher_code' => [$voucherRequired ? 'required' : 'nullable', 'string', 'max:100'],
             'guest_email' => ['nullable', 'email:rfc'],

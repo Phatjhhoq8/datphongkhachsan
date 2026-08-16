@@ -4,38 +4,68 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hotel;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\RoomType;
+use App\Services\AvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class HotelController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function destinations(): JsonResponse
+    {
+        $destinations = Hotel::query()
+            ->where('status', 'active')
+            ->orderBy('city')
+            ->get(['city', 'hero_image'])
+            ->reduce(function (array $result, Hotel $hotel): array {
+                $city = trim((string) $hotel->city);
+
+                if ($city === '') {
+                    return $result;
+                }
+
+                $result[$city] ??= ['name' => $city, 'count' => 0, 'image' => $hotel->hero_image];
+                $result[$city]['count']++;
+
+                if (! $result[$city]['image'] && $hotel->hero_image) {
+                    $result[$city]['image'] = $hotel->hero_image;
+                }
+
+                return $result;
+            }, []);
+
+        return response()->json(['data' => array_values($destinations)]);
+    }
+
+    public function index(Request $request, AvailabilityService $availability): JsonResponse
     {
         $hotels = Hotel::query()
             ->where('status', 'active')
-            ->when($request->filled('location'), function (Builder $query) use ($request) {
-                $location = (string) $request->string('location')->trim();
-                $query->where(fn (Builder $hotel) => $hotel
-                    ->where('city', 'like', "%{$location}%")
-                    ->orWhere('name', 'like', "%{$location}%")
-                    ->orWhere('address', 'like', "%{$location}%"));
-            })
-            ->with(['roomTypes' => fn ($query) => $query
-                ->where('active', true)
-                ->with(['images', 'amenities'])
-                ->withCount(['rooms as available_rooms' => fn ($rooms) => $rooms
-                    ->where('active', true)->where('operational_status', 'available')])])
-            ->withCount(['roomTypes as room_types_count' => fn (Builder $query) => $query->where('active', true), 'approvedReviews'])
-            ->withAvg('approvedReviews', 'rating_overall')
-            ->withMin(['roomTypes as room_types_min_price_per_night' => fn (Builder $query) => $query->where('active', true)], 'price_per_night')
+            ->with(['roomTypes.images', 'roomTypes.amenities', 'approvedReviews'])
             ->orderBy('name')
             ->get();
+
+        if ($request->filled('location')) {
+            $needle = mb_strtolower((string) $request->string('location')->trim());
+            $hotels = $hotels->filter(fn (Hotel $hotel) => collect([$hotel->city, $hotel->name, $hotel->address])
+                ->contains(fn ($value) => str_contains(mb_strtolower((string) $value), $needle)))->values();
+        }
+
+        $hotels->each(function (Hotel $hotel) use ($availability): void {
+            $roomTypes = $hotel->roomTypes->where('active', true)->values();
+            $roomTypes->each(fn (RoomType $roomType) => $roomType->setAttribute('available_rooms', $availability->rooms($roomType)->count()));
+            $hotel->setRelation('roomTypes', $roomTypes);
+            $hotel->setAttribute('room_types_count', $roomTypes->count());
+            $hotel->setAttribute('approved_reviews_count', $hotel->approvedReviews->count());
+            $hotel->setAttribute('approved_reviews_avg_rating', $hotel->approvedReviews->avg('rating_overall'));
+            $hotel->setAttribute('room_types_min_price_per_night', $roomTypes->min('price_per_night'));
+            $hotel->unsetRelation('approvedReviews');
+        });
 
         return response()->json(['data' => $hotels]);
     }
 
-    public function show(Request $request, Hotel $hotel): JsonResponse
+    public function show(Request $request, Hotel $hotel, AvailabilityService $availability): JsonResponse
     {
         $data = $request->validate([
             'checkin' => ['nullable', 'required_with:checkout', 'date_format:Y-m-d'],
@@ -45,20 +75,21 @@ class HotelController extends Controller
             'children' => ['nullable', 'integer', 'between:0,100'],
         ]);
         $rooms = (int) ($data['rooms'] ?? 1);
-        $roomTypes = fn (Builder $query) => $query
+        $hotel->load(['roomTypes.images', 'roomTypes.amenities', 'approvedReviews']);
+        $roomTypes = $hotel->roomTypes
             ->where('active', true)
-            ->with(['images', 'amenities'])
-            ->when(isset($data['checkin'], $data['checkout']), fn (Builder $query) => $query
-                ->matchingStay($data['checkin'], $data['checkout'], $rooms))
-            ->when(! isset($data['checkin']), fn (Builder $query) => $query
-                ->withCount(['rooms as available_rooms' => fn (Builder $roomsQuery) => $roomsQuery
-                    ->where('active', true)->where('operational_status', 'available')]))
-            ->when(isset($data['adults']), fn (Builder $query) => $query->where('max_adults', '>=', (int) ceil($data['adults'] / $rooms)))
-            ->when(isset($data['children']), fn (Builder $query) => $query->where('max_children', '>=', (int) ceil($data['children'] / $rooms)));
+            ->filter(function (RoomType $roomType) use ($data, $rooms, $availability): bool {
+                $available = $availability->rooms($roomType, $data['checkin'] ?? null, $data['checkout'] ?? null)->count();
+                $roomType->setAttribute('available_rooms', $available);
 
-        $hotel->load(['roomTypes' => $roomTypes])
-            ->loadCount('approvedReviews')
-            ->loadAvg('approvedReviews', 'rating_overall');
+                return $available >= $rooms
+                    && (! isset($data['adults']) || $roomType->max_adults >= (int) ceil($data['adults'] / $rooms))
+                    && (! isset($data['children']) || $roomType->max_children >= (int) ceil($data['children'] / $rooms));
+            })->values();
+        $hotel->setRelation('roomTypes', $roomTypes);
+        $hotel->setAttribute('approved_reviews_count', $hotel->approvedReviews->count());
+        $hotel->setAttribute('approved_reviews_avg_rating', $hotel->approvedReviews->avg('rating_overall'));
+        $hotel->unsetRelation('approvedReviews');
 
         return response()->json(['data' => $hotel]);
     }

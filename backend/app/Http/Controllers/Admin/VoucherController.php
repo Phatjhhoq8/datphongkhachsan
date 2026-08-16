@@ -12,7 +12,10 @@ class VoucherController extends AdminController
 {
     public function index(Request $request): JsonResponse
     {
-        $hotelId = $this->scopedHotelId($request, $request->integer('hotel_id') ?: null);
+        // Tự động xóa các voucher đã hết hạn khỏi database
+        Voucher::query()->whereNotNull('ends_at')->where('ends_at', '<', now())->delete();
+
+        $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
 
         return response()->json(['data' => Voucher::query()->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->latest()->get()]);
     }
@@ -20,7 +23,8 @@ class VoucherController extends AdminController
     public function store(Request $request): JsonResponse
     {
         $data = $this->validated($request);
-        $this->scopedHotelId($request, isset($data['hotel_id']) ? (int) $data['hotel_id'] : null);
+        $this->scopedHotelId($request, isset($data['hotel_id']) ? (string) $data['hotel_id'] : null);
+        $data['normalized_code'] = strtoupper(trim($data['code']));
 
         return response()->json(['data' => Voucher::query()->create($data)], 201);
     }
@@ -36,7 +40,8 @@ class VoucherController extends AdminController
     {
         $this->scopedHotelId($request, $voucher->hotel_id);
         $data = $this->validated($request, $voucher);
-        $this->scopedHotelId($request, isset($data['hotel_id']) ? (int) $data['hotel_id'] : null);
+        $this->scopedHotelId($request, isset($data['hotel_id']) ? (string) $data['hotel_id'] : null);
+        $data['normalized_code'] = strtoupper(trim($data['code']));
         $voucher->update($data);
 
         return response()->json(['data' => $voucher->refresh()]);

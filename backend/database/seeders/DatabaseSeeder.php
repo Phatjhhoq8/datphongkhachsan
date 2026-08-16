@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
                 'rating' => 4.8,
                 'star_rating' => 4,
                 'description' => 'Khách sạn nghỉ dưỡng thanh lịch giữa trung tâm Đà Lạt, dành riêng cho những kỳ nghỉ thư thái.',
-                'checkin_time' => '14:00:00',
+                'checkin_time' => '15:00:00',
                 'checkout_time' => '12:00:00',
                 'hero_image' => '/images/rooms/4/1.jpg',
             ]
@@ -58,7 +58,7 @@ class DatabaseSeeder extends Seeder
                 ]
             );
 
-            $roomType->amenities()->syncWithoutDetaching($amenities->take($index + 3)->pluck('id'));
+            $roomType->amenities()->syncWithoutDetaching($amenities->take($index + 3)->pluck('id')->all());
 
             foreach (range(1, 4) as $image) {
                 RoomImage::query()->firstOrCreate(

@@ -1,24 +1,42 @@
 name: datphong-v2
 
 services:
-  mysql:
-    image: mysql:8.0
+  mongodb:
+    image: mongo:8.0
     restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "${MYSQL_HOST_PORT:-3306}:3306"
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-datphong}
-      MYSQL_USER: ${MYSQL_USER:-datphong}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-datphong}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      - "${MONGODB_HOST_PORT:-27017}:27017"
     volumes:
-      - datphong_v2_mysql:/var/lib/mysql
+      - datphong_v2_mongodb:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ["CMD", "mongosh", "--quiet", "--host", "127.0.0.1:27017", "--eval", "quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)"]
       interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 20s
+      retries: 30
+      start_period: 10s
+
+  mongo-init:
+    image: mongo:8.0
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mongosh --quiet --host mongodb:27017 --eval '
+          try {
+            rs.status();
+          } catch (error) {
+            if (error.codeName === "NotYetInitialized") {
+              rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongodb:27017" }] });
+            } else {
+              throw error;
+            }
+          }
+        '
+        until mongosh --quiet --host mongodb:27017 --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; do sleep 2; done
 
   redis:
     image: redis:7-alpine
@@ -37,28 +55,36 @@ services:
     restart: unless-stopped
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - datphong_v2_public_storage:/var/www/html/storage/app/public
     environment:
       APP_NAME: ${APP_NAME:-DatPhong}
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
       APP_DEBUG: ${APP_DEBUG:-true}
+      PHP_CLI_SERVER_WORKERS: 8
       APP_URL: ${APP_URL:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/oauth/google/callback}
+      FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-}
+      FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
+      FACEBOOK_REDIRECT_URI: ${FACEBOOK_REDIRECT_URI:-http://localhost:8000/api/v1/auth/oauth/facebook/callback}
       LOG_CHANNEL: stderr
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${MYSQL_DATABASE:-datphong}
-      DB_USERNAME: ${MYSQL_USER:-datphong}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-datphong}
+      DB_CONNECTION: mongodb
+      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_STORE: redis
       QUEUE_CONNECTION: redis
-      SESSION_DRIVER: database
+      SESSION_DRIVER: redis
     depends_on:
-      mysql:
-        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -80,18 +106,44 @@ services:
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL:-http://localhost:8000}
       LOG_CHANNEL: stderr
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${MYSQL_DATABASE:-datphong}
-      DB_USERNAME: ${MYSQL_USER:-datphong}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-datphong}
+      DB_CONNECTION: mongodb
+      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_STORE: redis
       QUEUE_CONNECTION: redis
-      SESSION_DRIVER: database
+      SESSION_DRIVER: redis
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    image: datphong-backend:local
+    restart: unless-stopped
+    entrypoint: []
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      APP_NAME: ${APP_NAME:-DatPhong}
+      APP_ENV: ${APP_ENV:-local}
+      APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: mongodb
+      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
     depends_on:
       backend:
         condition: service_healthy
@@ -108,12 +160,10 @@ services:
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY:-base64:ZGF0cGhvbmctbG9jYWwtZGV2ZWxvcG1lbnQta2V5ISE=}
       APP_DEBUG: ${APP_DEBUG:-true}
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${MYSQL_DATABASE:-datphong}
-      DB_USERNAME: ${MYSQL_USER:-datphong}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-datphong}
+      DB_CONNECTION: mongodb
+      DB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-datphong}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/datphong?replicaSet=rs0}
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -136,6 +186,7 @@ services:
       REDIS_URL: redis://redis:6379
       REDIS_CHANNEL: staygo.events
       LARAVEL_AUTH_URL: http://backend:8000/api/v1/auth/me
+      LARAVEL_CHAT_AUTH_URL: http://backend:8000/api/v1/chat/socket-auth
       AUTH_CACHE_TTL_MS: 15000
     depends_on:
       backend:
@@ -159,6 +210,9 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
       VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3001}
@@ -167,5 +221,7 @@ services:
         condition: service_healthy
 
 volumes:
-  datphong_v2_mysql:
-    name: datphong_v2_mysql
+  datphong_v2_mongodb:
+    name: datphong_v2_mongodb
+  datphong_v2_public_storage:
+    name: datphong_v2_public_storage

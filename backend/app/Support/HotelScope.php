@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class HotelScope
 {
-    public static function allows(User $user, int $hotelId): bool
+    public static function allows(User $user, string $hotelId): bool
     {
         return $user->role === 'super_admin' || $user->hotel_id === $hotelId;
     }
@@ -19,7 +19,7 @@ class HotelScope
         }
 
         return $user->hotel_id === null
-            ? $query->whereRaw('1 = 0')
+            ? $query->where('_id', '__no_hotel_scope__')
             : $query->where($column, $user->hotel_id);
     }
 }

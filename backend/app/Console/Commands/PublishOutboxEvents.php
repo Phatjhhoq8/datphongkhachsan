@@ -56,10 +56,24 @@ class PublishOutboxEvents extends Command
 
     public function realtimeMessage(OutboxEvent $event): ?array
     {
-        if ($event->event_type === 'room.updated') {
-            $hotelId = (int) ($event->payload['hotel_id'] ?? 0);
+        if ($event->event_type === 'chat.message') {
+            $hotelId = (string) ($event->payload['hotel_id'] ?? '');
+            $conversationId = (string) ($event->payload['conversation_id'] ?? '');
 
-            return $hotelId > 0 ? [
+            return $hotelId !== '' && $conversationId !== '' ? [
+                'id' => (string) $event->event_id,
+                'type' => 'chat.message',
+                'hotel_id' => $hotelId,
+                'conversation_id' => $conversationId,
+                'data' => $event->payload,
+                'occurred_at' => $event->occurred_at?->toIso8601String(),
+            ] : null;
+        }
+
+        if ($event->event_type === 'room.updated') {
+            $hotelId = (string) ($event->payload['hotel_id'] ?? '');
+
+            return $hotelId !== '' ? [
                 'id' => $event->event_id,
                 'type' => 'room.updated',
                 'hotel_id' => $hotelId,
@@ -73,9 +87,9 @@ class PublishOutboxEvents extends Command
         }
 
         $booking = Booking::query()->with('rooms.roomType')->find($event->aggregate_id);
-        $hotelId = (int) ($booking?->rooms->first()?->hotel_id ?? $booking?->rooms->first()?->roomType?->hotel_id ?? 0);
+        $hotelId = (string) ($booking?->rooms->first()?->hotel_id ?? $booking?->rooms->first()?->roomType?->hotel_id ?? '');
 
-        return $booking && $hotelId > 0 ? [
+        return $booking && $hotelId !== '' ? [
             'id' => $event->event_id,
             'type' => 'booking.updated',
             'hotel_id' => $hotelId,
@@ -83,7 +97,7 @@ class PublishOutboxEvents extends Command
                 ...$event->payload,
                 'hotel_id' => $hotelId,
                 'status' => $booking->status,
-                'room_ids' => $booking->rooms->pluck('id')->all(),
+                'room_ids' => $booking->rooms->pluck('id')->map(fn ($id) => (string) $id)->all(),
             ],
             'occurred_at' => $event->occurred_at?->toIso8601String(),
         ] : null;

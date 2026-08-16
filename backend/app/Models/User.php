@@ -7,9 +7,9 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use MongoDB\Laravel\Auth\User as Authenticatable;
 
 class User extends Authenticatable
 {
@@ -17,6 +17,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     public const ROLES = ['super_admin', 'hotel_manager', 'receptionist', 'accountant', 'customer'];
+
+    protected $attributes = [
+        'role' => 'customer',
+        'status' => 'active',
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -31,6 +36,10 @@ class User extends Authenticatable
         'role',
         'hotel_id',
         'status',
+        'provider',
+        'provider_id',
+        'avatar',
+        'email_verified_at',
     ];
 
     /**
@@ -41,6 +50,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'provider_id',
     ];
 
     /**
@@ -52,7 +62,6 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'hotel_id' => 'integer',
             'password' => 'hashed',
             'last_login_at' => 'datetime',
         ];

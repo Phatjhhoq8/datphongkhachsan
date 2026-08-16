@@ -2,12 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class RoomImage extends Model
+class RoomImage extends MongoModel
 {
-    protected $fillable = ['room_type_id', 'url', 'sort_order'];
+    protected $fillable = ['room_type_id', 'path', 'url', 'sort_order'];
 
     public function roomType(): BelongsTo
     {

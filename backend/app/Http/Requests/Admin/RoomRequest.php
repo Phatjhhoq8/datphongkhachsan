@@ -15,7 +15,7 @@ class RoomRequest extends FormRequest
     public function rules(): array
     {
         $id = $this->route('room')?->id;
-        $hotelId = $this->integer('hotel_id');
+        $hotelId = $this->string('hotel_id')->toString();
 
         return [
             'hotel_id' => ['required', 'exists:hotels,id'],

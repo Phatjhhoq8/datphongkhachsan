@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class VoucherRedemption extends Model
+class VoucherRedemption extends MongoModel
 {
     protected $fillable = ['booking_id', 'voucher_id', 'user_id', 'guest_email', 'amount', 'redeemed_at'];
 

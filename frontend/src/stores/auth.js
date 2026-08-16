@@ -68,6 +68,13 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value
   }
 
+  async function exchangeOAuth(code) {
+    const response = await api.post('/auth/oauth/exchange', { code })
+    saveSession(response)
+    if (!user.value) await fetchMe()
+    return user.value
+  }
+
   async function logout() {
     try {
       if (token.value) await api.post('/auth/logout')
@@ -78,5 +85,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, roles, bootstrapped, isAuthenticated, isStaff, displayName, bootstrap, fetchMe, login, register, logout }
+  return { token, user, roles, bootstrapped, isAuthenticated, isStaff, displayName, bootstrap, fetchMe, login, register, exchangeOAuth, logout }
 })

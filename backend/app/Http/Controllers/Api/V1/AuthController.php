@@ -46,12 +46,12 @@ class AuthController extends Controller
 
         $user = User::query()->where('email', strtolower($validated['email']))->first();
 
-        if (! $user || ! Hash::check($validated['password'], $user->password)) {
-            return response()->json(['message' => 'The provided credentials are incorrect.'], 422);
+        if (! $user || ! is_string($user->password) || ! Hash::check($validated['password'], $user->password)) {
+            return response()->json(['message' => 'Thông tin đăng nhập không chính xác.'], 422);
         }
 
         if ($user->status !== 'active') {
-            return response()->json(['message' => 'This account is disabled.'], 403);
+            return response()->json(['message' => 'Tài khoản này đã bị vô hiệu hóa.'], 403);
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
@@ -63,7 +63,7 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()?->delete();
 
-        return response()->json(['message' => 'Logged out successfully.']);
+        return response()->json(['message' => 'Đăng xuất thành công.']);
     }
 
     public function me(Request $request): JsonResponse
@@ -71,9 +71,41 @@ class AuthController extends Controller
         return response()->json(['data' => $request->user()]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+        ]);
+
+        $request->user()->update($validated);
+
+        return response()->json(['data' => $request->user()->fresh()]);
+    }
+
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'confirmed', Password::min(8)],
+        ]);
+
+        if (! is_string($request->user()->password) || ! Hash::check($validated['current_password'], $request->user()->password)) {
+            return response()->json([
+                'message' => 'Mật khẩu hiện tại không chính xác.',
+                'errors' => ['current_password' => ['Mật khẩu hiện tại không chính xác.']],
+            ], 422);
+        }
+
+        $request->user()->update(['password' => $validated['password']]);
+        $request->user()->tokens()->delete();
+
+        return response()->json(['message' => 'Đổi mật khẩu thành công.']);
+    }
+
     public function forgotPassword(Request $request): JsonResponse
     {
-        $message = 'If an account exists for that email, a password reset code has been sent.';
+        $message = 'Nếu email tồn tại trên hệ thống, mã khôi phục mật khẩu đã được gửi đi.';
         $email = is_string($request->input('email')) ? strtolower(trim($request->input('email'))) : '';
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL) || ! User::query()->where('email', $email)->exists()) {
@@ -125,8 +157,7 @@ class AuthController extends Controller
                 ->whereNull('used_at')
                 ->where('expires_at', '>', now())
                 ->where('attempts', '<', self::MAX_OTP_ATTEMPTS)
-                ->latest('id')
-                ->lockForUpdate()
+                ->latest('created_at')
                 ->first();
 
             if (! $otp || ! Hash::check($validated['otp'], $otp->otp_hash)) {
@@ -135,7 +166,7 @@ class AuthController extends Controller
                 return false;
             }
 
-            $user = User::query()->where('email', $email)->lockForUpdate()->first();
+            $user = User::query()->where('email', $email)->first();
 
             if (! $user) {
                 return false;
@@ -149,10 +180,10 @@ class AuthController extends Controller
         });
 
         if (! $reset) {
-            return response()->json(['message' => 'The reset code is invalid or has expired.'], 422);
+            return response()->json(['message' => 'Mã khôi phục mật khẩu không chính xác hoặc đã hết hạn.'], 422);
         }
 
-        return response()->json(['message' => 'Password reset successfully.']);
+        return response()->json(['message' => 'Khôi phục mật khẩu thành công.']);
     }
 
     /** @return array{token: string, token_type: string, user: User} */

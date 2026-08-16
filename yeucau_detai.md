@@ -9,7 +9,7 @@ Dưới đây là toàn bộ nội dung yêu cầu và đặc tả của đề t
 
 * **Đối với khách hàng:** Mang lại trải nghiệm tìm kiếm và đặt phòng trực quan, chân thực nhờ công nghệ xem phòng 3D (Virtual Tour), tìm kiếm giọng nói và quy trình thanh toán, đặt cọc quốc tế tiện lợi.
 * **Đối với nhà quản lý:** Cung cấp công cụ quản trị khách sạn mạnh mẽ, tự động hóa quy trình check-in/check-out, và phân tích sâu dữ liệu vận hành (công suất phòng, hành vi khách hàng) để tối ưu giá phòng theo mùa.
-* **Đối với kỹ thuật:** Làm chủ kiến trúc hệ thống xử lý song song (Real-time booking để tránh trùng lịch phòng) và vận dụng mô hình cơ sở dữ liệu kết hợp (Hybrid Database).
+* **Đối với kỹ thuật:** Làm chủ kiến trúc hệ thống xử lý song song (Real-time booking để tránh trùng lịch phòng) và vận dụng kiến trúc lưu trữ phân tách theo mục đích sử dụng.
 
 ---
 
@@ -74,8 +74,9 @@ Kiến trúc giữ nguyên sự mạnh mẽ của đề tài trước, áp dụn
   * **Laravel (PHP):** Làm API chính xử lý logic đặt phòng, tính toán giá, quản lý hóa đơn và tích hợp PayPal.
   * **Node.js:** Xử lý Chatbox và đồng bộ Sơ đồ phòng theo thời gian thực (để khi phòng vừa có người đặt, lập tức khóa phòng đó lại trên màn hình của khách khác, tránh lỗi Overbooking).
 * **Cơ sở dữ liệu (Database):**
-  * **MySQL hoặc SQL Server:** Lưu dữ liệu quan trọng cần tính nhất quán cao (Thông tin khách hàng, Sơ đồ phòng, Hóa đơn thanh toán, Lịch đặt phòng).
-  * **MongoDB:** Lưu lịch sử chat, log tìm kiếm bằng giọng nói, tracking thời gian ở lại trang của khách để chạy phân tích hành vi.
+  * **MongoDB:** Là cơ sở dữ liệu duy nhất cho toàn bộ dữ liệu nghiệp vụ, bao gồm thông tin khách hàng, sơ đồ phòng, hóa đơn thanh toán, lịch đặt phòng, lịch sử chat, log tìm kiếm bằng giọng nói và tracking thời gian ở lại trang để chạy phân tích hành vi. MongoDB chạy replica set `rs0` để hỗ trợ transaction và bảo đảm tính nhất quán cho quy trình đặt phòng.
+  * **Redis:** Phục vụ cache, queue và outbox; không lưu dữ liệu nghiệp vụ làm nguồn dữ liệu chính.
+  * **Object/File Storage:** Lưu tệp ảnh thực tế và nội dung 3D (Virtual Tour); MongoDB chỉ lưu metadata và đường dẫn tham chiếu tới tệp.
 
 ---
 

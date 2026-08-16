@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Requests\Admin\RoomRequest;
 use App\Http\Resources\Admin\RoomResource;
+use App\Models\Booking;
 use App\Models\OutboxEvent;
 use App\Models\Room;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,7 +17,7 @@ class RoomController extends AdminController
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $hotelId = $this->scopedHotelId($request, $request->integer('hotel_id') ?: null);
+        $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
         $rooms = Room::query()->with('roomType')->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))
             ->when($request->filled('floor'), fn ($query) => $query->where('floor', $request->integer('floor')))
             ->orderBy('room_number')->paginate($request->integer('per_page', 50));
@@ -27,7 +28,7 @@ class RoomController extends AdminController
     public function store(RoomRequest $request): RoomResource
     {
         $data = $request->validated();
-        $this->scopedHotelId($request, (int) $data['hotel_id']);
+        $this->scopedHotelId($request, (string) $data['hotel_id']);
 
         return new RoomResource(Room::query()->create($data)->load('roomType'));
     }
@@ -43,7 +44,7 @@ class RoomController extends AdminController
     {
         $data = $request->validated();
         $this->scopedHotelId($request, $room->hotel_id);
-        $this->scopedHotelId($request, (int) $data['hotel_id']);
+        $this->scopedHotelId($request, (string) $data['hotel_id']);
         $room->update($data);
         $this->recordRoomUpdate($room->refresh()->load('roomType'));
 
@@ -60,14 +61,15 @@ class RoomController extends AdminController
 
     public function map(Request $request): array
     {
-        $hotelId = $this->scopedHotelId($request, $request->integer('hotel_id') ?: null);
+        $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
         abort_if($hotelId === null, 422, 'hotel_id is required.');
+        $occupiedRoomIds = Booking::query()->where('hotel_id', $hotelId)->where('status', 'checked_in')->get()
+            ->flatMap(fn (Booking $booking) => $booking->room_ids ?? [])->map(fn ($id) => (string) $id)->unique()->all();
         $rooms = Room::query()->with('roomType')->where('hotel_id', $hotelId)
-            ->withExists(['bookings as occupied' => fn (Builder $query) => $query->where('status', 'checked_in')])
             ->orderBy('floor')->orderBy('room_number')->get()
-            ->map(function (Room $room) {
+            ->map(function (Room $room) use ($occupiedRoomIds) {
                 $data = (new RoomResource($room))->resolve();
-                $data['effective_status'] = $room->occupied ? 'occupied' : $room->operational_status;
+                $data['effective_status'] = in_array((string) $room->id, $occupiedRoomIds, true) ? 'occupied' : $room->operational_status;
 
                 return $data;
             })->groupBy(fn (array $room) => (string) ($room['floor'] ?? 'unassigned'));
@@ -79,8 +81,13 @@ class RoomController extends AdminController
     {
         $this->scopedHotelId($request, $room->hotel_id);
         abort_unless($room->operational_status === 'cleaning', 422, 'Only a room being cleaned can be completed.');
-        $room->update(['operational_status' => 'available']);
-        $this->recordRoomUpdate($room->refresh()->load('roomType'));
+        DB::transaction(function () use ($room) {
+            $room->update([
+                'operational_status' => 'available',
+                'cleaning_completed_at' => now(),
+            ]);
+            $this->recordRoomUpdate($room->refresh()->load('roomType'));
+        });
 
         return new RoomResource($room);
     }

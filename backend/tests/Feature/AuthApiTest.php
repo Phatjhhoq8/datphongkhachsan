@@ -4,14 +4,20 @@ namespace Tests\Feature;
 
 use App\Models\PasswordResetOtp;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\RefreshMongoDatabase;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshMongoDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+    }
 
     public function test_register_login_me_and_logout_with_bearer_tokens(): void
     {

@@ -7,12 +7,12 @@ Route::post('/quotes', [BusinessController::class, 'quote']);
 Route::get('/hotels/{hotel:slug}/services', [BusinessController::class, 'services']);
 Route::get('/vouchers', [BusinessController::class, 'vouchers']);
 Route::post('/vouchers/validate', [BusinessController::class, 'validateVoucher']);
-Route::post('/bookings/{booking:code}/payments/mock/intents', [BusinessController::class, 'createPaymentIntent']);
-Route::post('/payments/mock/{payment:reference}/confirm', [BusinessController::class, 'confirmPayment']);
+Route::post('/bookings/{booking:code}/payments/mock/intents', [BusinessController::class, 'createPaymentIntent'])->middleware('throttle:30,1');
+Route::post('/payments/mock/{payment:reference}/confirm', [BusinessController::class, 'confirmPayment'])->middleware('throttle:30,1');
 Route::get('/bookings/{booking:code}/payments', [BusinessController::class, 'bookingPayments']);
 Route::get('/bookings/{booking:code}/invoice', [BusinessController::class, 'bookingInvoice']);
 // Temporary aliases for the current booking detail client.
-Route::post('/booking/{booking:code}/payments/mock/intents', [BusinessController::class, 'createPaymentIntent']);
+Route::post('/booking/{booking:code}/payments/mock/intents', [BusinessController::class, 'createPaymentIntent'])->middleware('throttle:30,1');
 Route::get('/booking/{booking:code}/payments', [BusinessController::class, 'bookingPayments']);
 Route::get('/booking/{booking:code}/invoice', [BusinessController::class, 'bookingInvoice']);
 Route::get('/hotels/{hotel:slug}/reviews', [BusinessController::class, 'reviews']);

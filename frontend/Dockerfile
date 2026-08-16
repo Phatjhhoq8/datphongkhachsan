@@ -3,11 +3,13 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY index.html vite.config.js ./
 COPY public ./public
+COPY scripts ./scripts
 COPY src ./src
+COPY test ./test
 
 ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
 ARG VITE_SOCKET_URL=http://localhost:3001

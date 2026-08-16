@@ -6,11 +6,13 @@ RUN apt-get update \
         gosu \
         libicu-dev \
         libonig-dev \
+        libssl-dev \
         libzip-dev \
+        pkg-config \
         unzip \
-    && docker-php-ext-install -j"$(nproc)" intl mbstring pdo_mysql zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && docker-php-ext-install -j"$(nproc)" intl mbstring zip \
+    && pecl install redis mongodb \
+    && docker-php-ext-enable redis mongodb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/pear
 

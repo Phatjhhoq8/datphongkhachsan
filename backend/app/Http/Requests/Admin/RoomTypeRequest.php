@@ -15,7 +15,7 @@ class RoomTypeRequest extends FormRequest
     public function rules(): array
     {
         $id = $this->route('room_type')?->id;
-        $hotelId = $this->integer('hotel_id');
+        $hotelId = $this->string('hotel_id')->toString();
 
         return [
             'hotel_id' => ['required', 'exists:hotels,id'],
@@ -33,7 +33,7 @@ class RoomTypeRequest extends FormRequest
             'refundable' => ['sometimes', 'boolean'],
             'breakfast_included' => ['sometimes', 'boolean'],
             'amenity_ids' => ['sometimes', 'array'],
-            'amenity_ids.*' => ['integer', 'exists:amenities,id'],
+            'amenity_ids.*' => ['string', 'exists:amenities,id'],
         ];
     }
 }

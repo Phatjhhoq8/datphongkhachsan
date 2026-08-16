@@ -18,7 +18,9 @@ async function submit() {
   error.value = ''
   try {
     await auth.login(form)
-    const destination = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/account'
+    const destination = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      ? route.query.redirect
+      : auth.isStaff ? '/admin' : '/account'
     router.push(destination)
   } catch (err) {
     error.value = apiError(err, err.message || 'Đăng nhập không thành công.')

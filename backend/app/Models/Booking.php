@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Booking extends Model
+class Booking extends MongoModel
 {
     public const INVENTORY_STATUSES = ['pending', 'confirmed', 'checked_in'];
 
@@ -17,7 +16,11 @@ class Booking extends Model
         'rooms_count', 'adults', 'children', 'nights', 'subtotal', 'total', 'status', 'payment_method',
         'payment_status', 'special_requests', 'currency', 'service_total', 'discount_total', 'paid_amount',
         'deposit_amount', 'payment_option', 'payment_state', 'voucher_id', 'checked_in_at', 'checked_out_at',
-        'cancelled_at', 'cancellation_reason', 'created_by', 'user_id',
+        'cancelled_at', 'cancellation_reason', 'created_by', 'user_id', 'hotel_id', 'room_ids',
+        'scheduled_checkin_at', 'scheduled_checkout_at', 'late_checkout_grace_minutes_snapshot',
+        'cleaning_duration_minutes_snapshot', 'hold_expires_at',
+        'refundable', 'free_cancellation_until', 'late_cancellation_fee_percent',
+        'cancellation_fee', 'refund_amount', 'source',
     ];
 
     protected $hidden = ['idempotency_key'];
@@ -36,6 +39,17 @@ class Booking extends Model
             'checked_in_at' => 'datetime',
             'checked_out_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'scheduled_checkin_at' => 'datetime',
+            'scheduled_checkout_at' => 'datetime',
+            'hold_expires_at' => 'datetime',
+            'refundable' => 'boolean',
+            'free_cancellation_until' => 'datetime',
+            'late_cancellation_fee_percent' => 'integer',
+            'cancellation_fee' => 'integer',
+            'refund_amount' => 'integer',
+            'late_checkout_grace_minutes_snapshot' => 'integer',
+            'cleaning_duration_minutes_snapshot' => 'integer',
+            'room_ids' => 'array',
         ];
     }
 

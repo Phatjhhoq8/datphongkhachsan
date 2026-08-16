@@ -10,17 +10,21 @@ use Illuminate\Validation\ValidationException;
 
 class QuoteCalculator
 {
-    public function calculate(array $data, ?int $userId = null, ?string $guestEmail = null, bool $lockVoucher = false): array
+    public function calculate(array $data, ?string $userId = null, ?string $guestEmail = null, bool $lockVoucher = false): array
     {
         $roomType = RoomType::query()->with('hotel')->findOrFail($data['room_type_id']);
         $rooms = (int) ($data['rooms'] ?? 1);
         $adults = (int) ($data['adults'] ?? 1);
         $children = (int) ($data['children'] ?? 0);
-        $nights = CarbonImmutable::parse($data['checkin'])->diffInDays($data['checkout']);
-
-        if ($nights < 1) {
+        $checkinTime = CarbonImmutable::parse($data['checkin']);
+        $checkoutTime = CarbonImmutable::parse($data['checkout']);
+        
+        if ($checkoutTime->lessThanOrEqualTo($checkinTime)) {
             throw ValidationException::withMessages(['checkout' => 'Checkout must be after checkin.']);
         }
+
+        $nights = (int) ceil($checkinTime->diffInMinutes($checkoutTime) / 1440);
+        $nights = max(1, $nights);
 
         $subtotal = $this->money($roomType->getRawOriginal('price_per_night')) * $nights * $rooms;
         $requested = $this->normalizeServices($data);
@@ -34,14 +38,13 @@ class QuoteCalculator
             throw ValidationException::withMessages(['service_ids' => 'One or more services are invalid for this hotel.']);
         }
 
-        $lines = $services->map(function (Service $service) use ($requested, $rooms, $nights, $adults, $children) {
+        $lines = $services->map(function (Service $service) use ($requested, $nights, $adults, $children) {
             $requestedQuantity = $requested[$service->id];
             $quantity = match ($service->pricing_type) {
                 'per_booking' => $requestedQuantity,
-                'per_room' => $rooms * $requestedQuantity,
                 'per_night' => $nights * $requestedQuantity,
-                'per_person' => ($adults + $children) * $requestedQuantity,
-                'quantity' => $requestedQuantity,
+                'per_guest' => ($adults + $children) * $requestedQuantity,
+                'per_unit' => $requestedQuantity,
                 default => throw ValidationException::withMessages(['service_ids' => "Unsupported pricing type: {$service->pricing_type}."]),
             };
             $unitPrice = $this->money($service->getRawOriginal('price'));
@@ -81,24 +84,23 @@ class QuoteCalculator
         $result = [];
 
         foreach ($data['service_ids'] ?? [] as $id) {
-            $result[(int) $id] = 1;
+            $result[(string) $id] = 1;
         }
 
         foreach ($data['services'] ?? [] as $line) {
-            $result[(int) $line['id']] = (int) ($line['quantity'] ?? 1);
+            $result[(string) $line['id']] = (int) ($line['quantity'] ?? 1);
         }
 
         return array_filter($result, fn (int $quantity) => $quantity > 0);
     }
 
-    private function voucher(?string $code, int $hotelId, int $order, ?int $userId, ?string $guestEmail, bool $lock): array
+    private function voucher(?string $code, string $hotelId, int $order, ?string $userId, ?string $guestEmail, bool $lock): array
     {
         if (! $code) {
             return [null, 0];
         }
 
-        $query = Voucher::query()->whereRaw('UPPER(code) = ?', [strtoupper(trim($code))]);
-        $voucher = ($lock ? $query->lockForUpdate() : $query)->first();
+        $voucher = Voucher::query()->where('normalized_code', strtoupper(trim($code)))->first();
         $now = now();
 
         if (! $voucher || ! $voucher->active || ($voucher->hotel_id && $voucher->hotel_id !== $hotelId)

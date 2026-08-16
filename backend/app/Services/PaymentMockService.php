@@ -6,15 +6,20 @@ use App\Models\Booking;
 use App\Models\Invoice;
 use App\Models\OutboxEvent;
 use App\Models\PaymentTransaction;
-use Illuminate\Database\QueryException;
+use App\Models\RoomNight;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use MongoDB\Driver\Exception\BulkWriteException;
 
 class PaymentMockService
 {
-    public function createIntent(Booking $booking, array $data, ?int $actorId = null): PaymentTransaction
+    public function createIntent(Booking $booking, array $data, ?string $actorId = null): PaymentTransaction
     {
+        if (in_array($booking->status, ['cancelled', 'expired'], true)) {
+            throw ValidationException::withMessages(['booking' => 'Payments are not allowed for a cancelled or expired booking.']);
+        }
+
         if (! empty($data['idempotency_key'])) {
             $existing = PaymentTransaction::query()->where('idempotency_key', $data['idempotency_key'])->first();
             if ($existing) {
@@ -60,7 +65,7 @@ class PaymentMockService
                 'payload' => ['provider' => 'mock', 'method' => $data['method']],
                 'actor_id' => $actorId,
             ]);
-        } catch (QueryException $exception) {
+        } catch (BulkWriteException $exception) {
             $existing = ! empty($data['idempotency_key'])
                 ? PaymentTransaction::query()->where('idempotency_key', $data['idempotency_key'])->first()
                 : null;
@@ -79,12 +84,21 @@ class PaymentMockService
         }
 
         return DB::transaction(function () use ($payment, $outcome) {
-            $payment = PaymentTransaction::query()->lockForUpdate()->findOrFail($payment->id);
+            $payment = PaymentTransaction::query()->findOrFail($payment->id);
             if ($payment->status !== 'created') {
                 return $payment;
             }
 
-            $booking = Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            $booking = Booking::query()->findOrFail($payment->booking_id);
+            if (in_array($booking->status, ['cancelled', 'expired'], true)) {
+                $payment->update([
+                    'status' => 'failed',
+                    'processed_at' => now(),
+                    'payload' => ['provider' => 'mock', 'reason' => 'booking_unpayable'],
+                ]);
+
+                return $payment->refresh();
+            }
             if ($outcome === 'failure') {
                 $payment->update(['status' => 'failed', 'processed_at' => now()]);
 
@@ -110,7 +124,14 @@ class PaymentMockService
                 'payment_state' => $state,
                 'payment_status' => $state === 'paid' ? 'paid' : ($state === 'refunded' ? 'refunded' : 'pending'),
                 'status' => $booking->status === 'pending' && $payment->type !== 'refund' ? 'confirmed' : $booking->status,
+                'hold_expires_at' => $payment->type !== 'refund' ? null : $booking->hold_expires_at,
             ]);
+            if ($payment->type !== 'refund') {
+                RoomNight::query()->where('booking_id', $booking->id)->update([
+                    'state' => 'booked',
+                    'expires_at' => null,
+                ]);
+            }
             if ($previousStatus !== $booking->status) {
                 $booking->statusHistories()->create([
                     'from_status' => $previousStatus,

@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Amenity extends Model
+class Amenity extends MongoModel
 {
     protected $fillable = ['slug', 'name'];
 

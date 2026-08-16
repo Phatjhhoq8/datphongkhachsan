@@ -10,7 +10,7 @@ const auth = useAuthStore()
       <aside class="account-sidebar">
         <div class="profile-summary">
           <span>{{ auth.displayName.charAt(0).toUpperCase() }}</span>
-          <div><strong>{{ auth.displayName }}</strong><small>{{ auth.user?.email }}</small></div>
+          <div><strong>{{ auth.displayName }}</strong><small>{{ auth.user?.email }}</small><span class="sidebar-badge">👑 Thành viên</span></div>
         </div>
         <nav aria-label="Tài khoản">
           <RouterLink to="/account">Hồ sơ</RouterLink>
@@ -34,4 +34,5 @@ const auth = useAuthStore()
 .account-panel { padding:28px; }.account-panel-head { display:flex; justify-content:space-between; align-items:start; margin-bottom:22px; }.account-panel-head h1 { margin:0 0 4px; font-size:27px; }.account-panel-head p { margin:0; color:var(--muted); }
 .account-state { min-height:260px; display:grid; place-items:center; text-align:center; color:var(--muted); }.account-state .spinner { margin:auto; }
 @media (max-width:760px) { .account-page { padding-top:24px; }.account-grid { grid-template-columns:1fr; }.account-sidebar nav { flex-direction:row; overflow:auto; }.account-sidebar nav a { white-space:nowrap; }.account-panel { padding:21px 17px; } }
+.sidebar-badge { align-self:flex-start; margin-top:5px; background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:2px 8px; border-radius:12px; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; display:inline-flex; }
 </style>

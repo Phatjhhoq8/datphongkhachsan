@@ -12,7 +12,7 @@ class UserController extends AdminController
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $hotelId = $this->scopedHotelId($request, $request->integer('hotel_id') ?: null);
+        $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
         $users = User::query()->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))
             ->when($request->filled('role'), fn ($query) => $query->where('role', $request->string('role')))
             ->orderBy('name')->paginate($request->integer('per_page', 20));

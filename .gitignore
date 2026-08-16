@@ -16,9 +16,7 @@ frontend/.env
 backend/storage/logs/*.log
 backend/bootstrap/cache/*.php
 
-# Local database and Docker data
-*.sqlite
-*.sqlite3
+# Local Docker data
 volumes/
 docker-data/
 

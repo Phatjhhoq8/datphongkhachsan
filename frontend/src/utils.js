@@ -18,5 +18,9 @@ export function nights(checkin, checkout) {
 export function localImage(value, fallbackId = 1) {
   if (typeof value === 'string' && value.startsWith('/')) return value
   if (typeof value === 'string' && value.includes('/images/')) return value.slice(value.indexOf('/images/'))
-  return `/images/rooms/${fallbackId}/1.jpg`
+  let safeId = Number(fallbackId) || 1
+  if (safeId < 1 || safeId > 10) {
+    safeId = (safeId % 10) || 1
+  }
+  return `/images/rooms/${safeId}/1.jpg`
 }

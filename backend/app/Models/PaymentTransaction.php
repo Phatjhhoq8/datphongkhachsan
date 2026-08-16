@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PaymentTransaction extends Model
+class PaymentTransaction extends MongoModel
 {
     protected $fillable = ['uuid', 'reference', 'booking_id', 'method', 'type', 'amount', 'status', 'idempotency_key', 'card_last_four', 'payload', 'processed_at', 'actor_id'];
 

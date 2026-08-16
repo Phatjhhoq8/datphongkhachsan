@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class PasswordResetOtp extends Model
+class PasswordResetOtp extends MongoModel
 {
+    protected $attributes = [
+        'attempts' => 0,
+    ];
+
     protected $fillable = ['email', 'otp_hash', 'expires_at', 'attempts', 'used_at'];
 
     protected $hidden = ['otp_hash'];

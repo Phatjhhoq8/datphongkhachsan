@@ -30,6 +30,10 @@ class HotelRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'checkin_time' => ['required', 'date_format:H:i'],
             'checkout_time' => ['required', 'date_format:H:i'],
+            'late_checkout_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:720'],
+            'cleaning_duration_minutes' => ['sometimes', 'integer', 'min:1', 'max:1440'],
+            'free_cancellation_hours' => ['sometimes', 'integer', 'min:0', 'max:8760'],
+            'late_cancellation_fee_percent' => ['sometimes', 'integer', 'between:0,100'],
             'hero_image' => ['nullable', 'string', 'max:2048'],
         ];
     }

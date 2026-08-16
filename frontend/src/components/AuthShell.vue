@@ -27,7 +27,7 @@ defineProps({
 <style>
 .auth-page { width:min(1040px,calc(100% - 32px)); min-height:610px; margin:48px auto 70px; display:grid; grid-template-columns:.9fr 1.1fr; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 16px 45px #13243a16; }
 .auth-aside { display:flex; align-items:flex-end; padding:48px; color:#fff; background:linear-gradient(145deg,#075c9fe8,#0877cce8),url('/images/hotel-hero.jpg') center/cover; }
-.auth-aside h2 { font-size:30px; margin:12px 0; }
+.auth-aside h2 { font-size:28px; margin:12px 0; line-height:1.35; text-wrap:balance; }
 .auth-aside p:last-child { color:#d8efff; }
 .auth-logo { display:grid; place-items:center; width:46px; height:46px; border-radius:14px 14px 14px 3px; background:#fff; color:var(--blue); font-size:25px; font-weight:900; }
 .auth-card { align-self:center; padding:48px 64px; }

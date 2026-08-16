@@ -2,17 +2,32 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Room extends Model
+class Room extends MongoModel
 {
-    protected $fillable = ['hotel_id', 'room_type_id', 'room_number', 'floor', 'active', 'map_x', 'map_y', 'operational_status'];
+    protected $attributes = [
+        'active' => true,
+        'operational_status' => 'available',
+    ];
+
+    protected $fillable = [
+        'hotel_id', 'room_type_id', 'room_number', 'floor', 'active', 'map_x', 'map_y',
+        'operational_status', 'cleaning_started_at', 'cleaning_completed_at', 'available_at',
+    ];
 
     protected function casts(): array
     {
-        return ['floor' => 'integer', 'active' => 'boolean', 'map_x' => 'decimal:2', 'map_y' => 'decimal:2'];
+        return [
+            'floor' => 'integer',
+            'active' => 'boolean',
+            'map_x' => 'decimal:2',
+            'map_y' => 'decimal:2',
+            'cleaning_started_at' => 'datetime',
+            'cleaning_completed_at' => 'datetime',
+            'available_at' => 'datetime',
+        ];
     }
 
     protected static function booted(): void

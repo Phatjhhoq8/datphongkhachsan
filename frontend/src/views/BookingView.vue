@@ -27,7 +27,14 @@ const error = ref('')
 const paymentError = ref('')
 const paymentModal = ref(false)
 const createdBooking = ref(null)
-const guest = reactive({ first_name: '', last_name: '', email: '', phone: '', special_requests: '', payment_method: 'pay_at_hotel', payment_option: 'full' })
+function defaultArrivalTime() {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const guest = reactive({ first_name: '', last_name: '', email: '', phone: '', special_requests: '', payment_method: 'pay_at_hotel', payment_option: 'full', arrival_time: route.query.arrival_time || defaultArrivalTime() })
 
 const checkin = computed(() => seedQuote.value?.checkin ?? route.query.checkin)
 const checkout = computed(() => seedQuote.value?.checkout ?? route.query.checkout)
@@ -37,9 +44,24 @@ const stayNights = computed(() => nights(checkin.value, checkout.value))
 const pricing = computed(() => quote.value?.pricing ?? quote.value?.breakdown ?? quote.value ?? {})
 const total = computed(() => Number(pricing.value.total ?? 0))
 const amountDue = computed(() => guest.payment_option === 'deposit' ? Number(quote.value?.deposit_amount ?? total.value) : total.value)
+const depositPercent = computed(() => {
+  if (!quote.value || !total.value) return 0
+  const dep = Number(quote.value.deposit_amount ?? 0)
+  if (dep <= 0 || dep >= total.value) return 100
+  return Math.round((dep / total.value) * 100)
+})
 const bookingCode = computed(() => createdBooking.value?.code ?? createdBooking.value?.booking_code ?? createdBooking.value?.reference ?? '')
 const modalMethod = computed(() => ({ credit_card: 'card', vietqr: 'vietqr', paypal: 'paypal' })[guest.payment_method] ?? 'card')
 const isOnline = computed(() => ['credit_card', 'vietqr', 'paypal'].includes(guest.payment_method))
+const previewQrUrl = computed(() => `https://img.vietqr.io/image/MB-9704221900123456789-compact2.png?amount=${Math.round(amountDue.value)}&addInfo=${encodeURIComponent(`STAYGO DEMO ${bookingCode.value || 'BOOKING'}`)}&accountName=STAYGO%20DEMO`)
+const cancellationDeadline = computed(() => {
+  if (!checkin.value || !seedQuote.value?.hotel) return ''
+  const time = String(seedQuote.value.hotel.checkin_time ?? '14:00').slice(0, 5)
+  const checkinAt = new Date(`${checkin.value}T${time}:00`)
+  if (isNaN(checkinAt.getTime())) return ''
+  checkinAt.setHours(checkinAt.getHours() - Number(seedQuote.value.hotel.free_cancellation_hours ?? 24))
+  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(checkinAt)
+})
 
 function loadStoredQuote() {
   try { seedQuote.value = JSON.parse(sessionStorage.getItem('staygo_booking_quote')) } catch { seedQuote.value = null }
@@ -117,6 +139,7 @@ async function submitBooking() {
       guest_phone: guest.phone,
       special_requests: guest.special_requests || null,
       payment_method: ({ paypal: 'paypal_mock', credit_card: 'card_mock', vietqr: 'vietqr_mock' })[guest.payment_method] ?? guest.payment_method,
+      arrival_time: guest.arrival_time || null,
     }
     const data = responseData(await api.post('/bookings', payload, { headers: { 'Idempotency-Key': idempotencyKey() } }))
     createdBooking.value = data.booking ?? data
@@ -156,16 +179,16 @@ onMounted(loadCheckout)
 </script>
 
 <template>
-  <div class="booking-bar"><div class="container"><span class="brand-mini">StayGo</span><ol><li class="current">1. Tùy chọn</li><li>2. Thanh toán</li><li>3. Xác nhận</li></ol></div></div>
   <div class="booking-page container">
     <section class="booking-form-wrap"><nav class="breadcrumbs"><a href="/hotel">Trang chủ</a><span>/</span><span>Đặt phòng</span></nav><h1>Hoàn tất kỳ nghỉ</h1><p class="lead">Giá và phòng trống được xác nhận trực tiếp từ máy chủ.</p>
       <div v-if="loading" class="state-card"><span class="spinner"></span><h2>Đang lấy báo giá...</h2></div>
       <form v-else class="booking-form" @submit.prevent="submitBooking">
-        <div class="form-panel"><h2>Thông tin người liên hệ</h2><p>Xác nhận đặt phòng sẽ được gửi đến email này.</p><div class="two-columns"><label><span>Họ</span><input v-model.trim="guest.last_name" autocomplete="family-name" required /></label><label><span>Tên</span><input v-model.trim="guest.first_name" autocomplete="given-name" required /></label><label><span>Email</span><input v-model.trim="guest.email" type="email" autocomplete="email" required /></label><label><span>Số điện thoại</span><input v-model.trim="guest.phone" type="tel" autocomplete="tel" required /></label></div></div>
+        <div class="form-panel"><h2>Thông tin người liên hệ</h2><p>Xác nhận đặt phòng sẽ được gửi đến email này.</p><div class="two-columns"><label><span>Họ (không bắt buộc)</span><input v-model.trim="guest.last_name" autocomplete="family-name" /></label><label><span>Tên <span class="required-star">*</span></span><input v-model.trim="guest.first_name" autocomplete="given-name" required /></label><label><span>Email <span class="required-star">*</span></span><input v-model.trim="guest.email" type="email" autocomplete="email" required /></label><label><span>Số điện thoại <span class="required-star">*</span></span><input v-model.trim="guest.phone" type="tel" autocomplete="tel" required /></label><label class="full-width"><span>Giờ nhận phòng dự kiến</span><input v-model="guest.arrival_time" type="time" /></label></div></div>
         <div class="form-panel"><h2>Dịch vụ thêm</h2><p>Chọn trước dịch vụ để máy chủ cập nhật báo giá.</p><ServiceSelector v-model="selectedServices" :services="services" :disabled="quoting" /></div>
-        <div class="form-panel"><h2>Mã ưu đãi</h2><VoucherInput v-model="voucherCode" :loading="quoting" :message="voucherMessage" :valid="voucherValid" @apply="requestQuote({ voucher: true })" /></div>
-        <div class="form-panel"><h2>Thanh toán bao nhiêu?</h2><div class="payment-split"><label><input v-model="guest.payment_option" type="radio" value="deposit" /><span><strong>Đặt cọc</strong><small>Thanh toán khoản cọc do khách sạn quy định.</small></span></label><label><input v-model="guest.payment_option" type="radio" value="full" /><span><strong>Toàn bộ</strong><small>Thanh toán toàn bộ giá trị đặt phòng.</small></span></label></div></div>
-        <div class="form-panel"><h2>Phương thức thanh toán</h2><div class="method-grid"><label v-for="method in [{id:'pay_at_hotel',icon:'⌂',name:'Tại khách sạn',note:'Không thanh toán online'},{id:'paypal',icon:'P',name:'PayPal',note:'Sandbox mô phỏng'},{id:'credit_card',icon:'▰',name:'Thẻ',note:'Visa / Mastercard demo'},{id:'vietqr',icon:'▦',name:'VietQR',note:'QR và điện thoại giả lập'}]" :key="method.id" :class="{ selected: guest.payment_method === method.id }"><input v-model="guest.payment_method" type="radio" :value="method.id" /><b>{{ method.icon }}</b><span><strong>{{ method.name }}</strong><small>{{ method.note }}</small></span></label></div><p v-if="isOnline" class="notice">Chế độ demo: không kết nối cổng thanh toán và không phát sinh giao dịch thật.</p></div>
+        <div class="form-panel"><h2>Mã ưu đãi</h2><VoucherInput v-model="voucherCode" :loading="quoting" :message="voucherMessage" :valid="voucherValid" :hotel-id="seedQuote?.hotel?.id || seedQuote?.hotel?._id" :total-amount="total" @apply="requestQuote({ voucher: true })" /></div>
+        <div class="form-panel"><h2>Chính sách hủy</h2><p v-if="seedQuote?.room?.refundable === false"><strong>Không hoàn tiền:</strong> phí hủy bằng 100% tổng giá trị sau khi đặt phòng được xác nhận và thanh toán.</p><p v-else>Hủy miễn phí đến <strong>{{ cancellationDeadline }}</strong>. Sau thời điểm này, phí hủy là <strong>{{ seedQuote?.hotel?.late_cancellation_fee_percent ?? 30 }}%</strong> tổng giá trị.</p><small>Đặt phòng chờ xác nhận hoặc chưa thanh toán luôn được hủy miễn phí.</small></div>
+        <div class="form-panel"><h2>Thanh toán bao nhiêu?</h2><div class="payment-split"><label><input v-model="guest.payment_option" type="radio" value="deposit" /><span><strong>Đặt cọc {{ depositPercent > 0 && depositPercent < 100 ? `${depositPercent}%` : '' }}</strong><small>Thanh toán khoản cọc tương đương {{ depositPercent > 0 && depositPercent < 100 ? `${depositPercent}%` : 'một phần' }} tổng tiền.</small></span></label><label><input v-model="guest.payment_option" type="radio" value="full" /><span><strong>Toàn bộ (100%)</strong><small>Thanh toán toàn bộ giá trị đặt phòng.</small></span></label></div></div>
+        <div class="form-panel"><h2>Phương thức thanh toán</h2><div class="method-grid"><label v-for="method in [{id:'pay_at_hotel',icon:'⌂',name:'Tại khách sạn',note:'Thanh toán trực tiếp khi nhận phòng'},{id:'paypal',icon:'P',name:'PayPal',note:'Cổng thanh toán điện tử quốc tế'},{id:'credit_card',icon:'▰',name:'Thẻ tín dụng / Ghi nợ',note:'Visa / Mastercard / JCB'},{id:'vietqr',icon:'▦',name:'VietQR',note:'Quét mã QR thanh toán nhanh'}]" :key="method.id" :class="{ selected: guest.payment_method === method.id }"><input v-model="guest.payment_method" type="radio" :value="method.id" /><b>{{ method.icon }}</b><span><strong>{{ method.name }}</strong><small>{{ method.note }}</small></span></label></div></div>
         <div class="form-panel"><h2>Yêu cầu đặc biệt</h2><label><span>Ghi chú cho nơi nghỉ (không bắt buộc)</span><textarea v-model.trim="guest.special_requests" rows="3" placeholder="Ví dụ: nhận phòng muộn, phòng tầng cao"></textarea></label></div>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p><button class="primary submit-booking" :disabled="submitting || quoting || !quote" type="submit">{{ submitting ? 'Đang giữ phòng...' : isOnline ? `Đặt phòng và thanh toán ${money(amountDue)}` : 'Xác nhận đặt phòng' }}</button><p class="terms">Bằng việc xác nhận, bạn đồng ý với chính sách đặt và hủy phòng của nơi nghỉ.</p>
       </form>
@@ -176,5 +199,9 @@ onMounted(loadCheckout)
 </template>
 
 <style scoped>
-.payment-split,.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.payment-split label,.method-grid label{display:flex;align-items:center;gap:10px;border:1px solid #dce3ea;border-radius:9px;padding:13px;cursor:pointer}.payment-split label:has(input:checked),.method-grid label.selected{border-color:#0877cc;background:#f1f8fd}.payment-split input,.method-grid input{width:auto;accent-color:#0877cc}.payment-split strong,.payment-split small,.method-grid strong,.method-grid small{display:block}.payment-split small,.method-grid small{color:#637083;font-size:10px}.method-grid label>b{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:#e9f5fd;color:#0877cc;font-size:17px}.recalculating{display:flex;align-items:center;gap:7px;color:#0877cc;font-size:11px;margin:12px 0}.mini-spinner{width:14px;height:14px;border:2px solid #d8eaf7;border-top-color:#0877cc;border-radius:50%;animation:spin .7s linear infinite}@media(max-width:620px){.payment-split,.method-grid{grid-template-columns:1fr}.booking-bar ol{font-size:9px}}
+.payment-split,.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.payment-split label,.method-grid label{display:flex;align-items:center;gap:10px;border:1px solid #dce3ea;border-radius:9px;padding:13px;cursor:pointer}.payment-split label:has(input:checked),.method-grid label.selected{border-color:#0877cc;background:#f1f8fd}.payment-split input,.method-grid input{width:auto;accent-color:#0877cc}.payment-split strong,.payment-split small,.method-grid strong,.method-grid small{display:block}.payment-split small,.method-grid small{color:#637083;font-size:10px}.method-grid label>b{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:#e9f5fd;color:#0877cc;font-size:17px}.payment-preview{margin-top:14px;border:1px solid #dce3ea;border-radius:14px;background:#f8fbfe;padding:15px}.preview-card{overflow:hidden;position:relative;border-radius:16px;padding:18px;color:#fff;background:linear-gradient(135deg,#111827,#1e1b4b 60%,#0877cc);box-shadow:0 12px 28px #13243a18}.preview-card div{display:flex;justify-content:space-between;font-size:10px;font-weight:900;letter-spacing:1px}.preview-card strong{display:block;margin:28px 0 10px;font-size:18px;letter-spacing:2px}.preview-card small{color:#dbeafe}.preview-qr,.preview-paypal{display:flex;align-items:center;gap:15px}.preview-qr img{width:118px;height:118px;object-fit:contain;background:#fff;border:1px solid #e1e7ed;border-radius:12px;padding:6px}.preview-qr strong,.preview-qr span,.preview-paypal strong{display:block}.preview-qr span{color:#0877cc;font-size:18px;font-weight:900}.preview-qr small,.preview-paypal small{display:block;color:#637083;margin-top:5px}.preview-paypal>b{flex:0 0 auto;color:#003087;font-size:32px;font-weight:900}.preview-paypal>b span{color:#179bd7}.recalculating{display:flex;align-items:center;gap:7px;color:#0877cc;font-size:11px;margin:12px 0}.mini-spinner{width:14px;height:14px;border:2px solid #d8eaf7;border-top-color:#0877cc;border-radius:50%;animation:spin .7s linear infinite}
+.two-columns label.full-width { grid-column: span 2; }
+.two-columns label.full-width input { width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px; background-color: #fff; font-size: 13.5px; color: #13243a; font-weight: 500; cursor: pointer; outline: none; transition: border-color 0.2s ease; }
+.two-columns label.full-width input:focus { border-color: #0877cc; }
+@media(max-width:620px){.payment-split,.method-grid{grid-template-columns:1fr}.booking-bar ol{font-size:9px}.preview-qr,.preview-paypal{align-items:flex-start}.preview-qr img{width:96px;height:96px}.two-columns label.full-width { grid-column: span 1; }}
 </style>

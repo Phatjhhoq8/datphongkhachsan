@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class RoomType extends Model
+class RoomType extends MongoModel
 {
+    protected $attributes = [
+        'active' => true,
+        'max_children' => 0,
+        'refundable' => false,
+        'breakfast_included' => false,
+    ];
+
     protected $fillable = ['hotel_id', 'slug', 'code', 'name', 'description', 'size_m2', 'bed_description', 'active', 'max_adults', 'max_children', 'price_per_night', 'base_cost_per_night', 'refundable', 'breakfast_included'];
 
     protected function casts(): array
@@ -47,20 +52,5 @@ class RoomType extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
-    }
-
-    public function scopeMatchingStay(Builder $query, string $checkin, string $checkout, int $rooms): Builder
-    {
-        $available = fn (Builder $roomQuery) => $roomQuery
-            ->where('active', true)
-            ->where('operational_status', 'available')
-            ->whereDoesntHave('bookings', fn (Builder $bookingQuery) => $bookingQuery
-                ->whereIn('status', Booking::INVENTORY_STATUSES)
-                ->where('checkin', '<', $checkout)
-                ->where('checkout', '>', $checkin));
-
-        return $query
-            ->withCount(['rooms as available_rooms' => $available])
-            ->whereHas('rooms', $available, '>=', $rooms);
     }
 }

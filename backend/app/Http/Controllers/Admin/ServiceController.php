@@ -12,7 +12,7 @@ class ServiceController extends AdminController
 {
     public function index(Request $request): JsonResponse
     {
-        $hotelId = $this->scopedHotelId($request, $request->integer('hotel_id') ?: null);
+        $hotelId = $this->scopedHotelId($request, $request->filled('hotel_id') ? (string) $request->input('hotel_id') : null);
 
         return response()->json(['data' => Service::query()->when($hotelId, fn ($query) => $query->where('hotel_id', $hotelId))->orderBy('name')->get()]);
     }
@@ -20,7 +20,7 @@ class ServiceController extends AdminController
     public function store(Request $request): JsonResponse
     {
         $data = $this->validated($request);
-        $this->scopedHotelId($request, (int) $data['hotel_id']);
+        $this->scopedHotelId($request, (string) $data['hotel_id']);
 
         return response()->json(['data' => Service::query()->create($data)], 201);
     }
@@ -36,7 +36,7 @@ class ServiceController extends AdminController
     {
         $this->scopedHotelId($request, $service->hotel_id);
         $data = $this->validated($request, $service);
-        $this->scopedHotelId($request, (int) $data['hotel_id']);
+        $this->scopedHotelId($request, (string) $data['hotel_id']);
         $service->update($data);
 
         return response()->json(['data' => $service->refresh()]);
@@ -54,7 +54,7 @@ class ServiceController extends AdminController
     {
         return $request->validate([
             'hotel_id' => ['required', 'exists:hotels,id'],
-            'code' => ['required', 'string', 'max:255', Rule::unique('services')->where('hotel_id', $request->integer('hotel_id'))->ignore($service)],
+            'code' => ['required', 'string', 'max:255', Rule::unique('services')->where('hotel_id', (string) $request->input('hotel_id'))->ignore($service)],
             'name' => ['required', 'string', 'max:255'], 'description' => ['nullable', 'string'],
             'pricing_type' => ['required', Rule::in(['per_booking', 'per_night', 'per_guest', 'per_unit'])],
             'price' => ['required', 'integer', 'min:0'], 'cost' => ['nullable', 'integer', 'min:0'], 'active' => ['sometimes', 'boolean'],

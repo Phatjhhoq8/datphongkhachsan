@@ -4,70 +4,62 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SearchRequest;
-use App\Models\Hotel;
 use App\Models\RoomType;
+use App\Services\AvailabilityService;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 
 class SearchController extends Controller
 {
-    public function __invoke(SearchRequest $request): JsonResponse
+    public function __invoke(SearchRequest $request, AvailabilityService $availability): JsonResponse
     {
         $data = $request->validated();
         $rooms = (int) $data['rooms'];
         $children = (int) ($data['children'] ?? 0);
         $nights = CarbonImmutable::parse($data['checkin'])->diffInDays($data['checkout']);
 
-        $query = RoomType::query()
-            ->with([
-                'hotel' => fn ($hotel) => $hotel
-                    ->withCount('approvedReviews')
-                    ->withAvg('approvedReviews', 'rating_overall'),
-                'images',
-                'amenities',
-            ])
-            ->matchingStay($data['checkin'], $data['checkout'], $rooms)
-            ->where('max_adults', '>=', (int) ceil($data['adults'] / $rooms))
-            ->where('max_children', '>=', (int) ceil($children / $rooms));
+        $location = mb_strtolower((string) ($data['location'] ?? ''));
+        $requestedAmenities = $data['amenities'] ?? [];
+        $requestedTypes = array_map('mb_strtolower', $data['room_type'] ?? []);
+        $keyword = mb_strtolower((string) ($data['keyword'] ?? ''));
 
-        if (! empty($data['location'])) {
-            $location = $data['location'];
-            $query->whereHas('hotel', fn (Builder $hotel) => $hotel
-                ->where('city', 'like', "%{$location}%")
-                ->orWhere('name', 'like', "%{$location}%")
-                ->orWhere('address', 'like', "%{$location}%"));
-        }
+        $results = RoomType::query()->where('active', true)->with(['hotel.approvedReviews', 'images', 'amenities'])->get()
+            ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $availability): bool {
+                $checkinParam = isset($data['arrival_time']) ? "{$data['checkin']} {$data['arrival_time']}" : $data['checkin'];
+                $available = $availability->rooms($roomType, $checkinParam, $data['checkout'])->count();
+                $roomType->setAttribute('available_rooms', $available);
+                $hotelText = mb_strtolower(implode(' ', [$roomType->hotel?->city, $roomType->hotel?->name, $roomType->hotel?->address]));
+                $amenitySlugs = $roomType->amenities->pluck('slug')->all();
+                $typeText = mb_strtolower("{$roomType->slug} {$roomType->name}");
 
-        $query->when(isset($data['min_price']), fn (Builder $q) => $q->where('price_per_night', '>=', $data['min_price']))
-            ->when(isset($data['max_price']), fn (Builder $q) => $q->where('price_per_night', '<=', $data['max_price']));
-
-        foreach ($data['amenities'] ?? [] as $amenity) {
-            $query->whereHas('amenities', fn (Builder $q) => $q->where('slug', $amenity));
-        }
-
-        if (! empty($data['room_type'])) {
-            $query->where(function (Builder $types) use ($data) {
-                foreach ($data['room_type'] as $type) {
-                    $types->orWhere('slug', 'like', "%{$type}%")->orWhere('name', 'like', "%{$type}%");
+                return $available >= $rooms
+                    && $roomType->max_adults >= (int) ceil($data['adults'] / $rooms)
+                    && $roomType->max_children >= (int) ceil($children / $rooms)
+                    && ($location === '' || str_contains($hotelText, $location))
+                    && (! isset($data['min_price']) || $roomType->price_per_night >= $data['min_price'])
+                    && (! isset($data['max_price']) || $roomType->price_per_night <= $data['max_price'])
+                    && count(array_diff($requestedAmenities, $amenitySlugs)) === 0
+                    && ($requestedTypes === [] || collect($requestedTypes)->contains(fn ($type) => str_contains($typeText, $type)))
+                    && ($keyword === '' || str_contains($typeText, $keyword))
+                    && (! ($data['refundable'] ?? false) || $roomType->refundable)
+                    && (empty($data['stars']) || in_array($roomType->hotel?->star_rating, $data['stars'], true));
+            })
+            ->each(function (RoomType $roomType) use ($nights, $rooms) {
+                if ($roomType->hotel) {
+                    $roomType->hotel->setAttribute('approved_reviews_count', $roomType->hotel->approvedReviews->count());
+                    $roomType->hotel->setAttribute('approved_reviews_avg_rating', $roomType->hotel->approvedReviews->avg('rating_overall'));
+                    $roomType->hotel->unsetRelation('approvedReviews');
                 }
+                $roomType->setAttribute('nights', $nights);
+                $roomType->setAttribute('total_price', number_format((float) $roomType->price_per_night * $nights * $rooms, 2, '.', ''));
             });
-        }
 
-        $query->when($data['refundable'] ?? false, fn (Builder $q) => $q->where('refundable', true))
-            ->when(! empty($data['stars']), fn (Builder $q) => $q->whereHas('hotel', fn (Builder $hotel) => $hotel->whereIn('star_rating', $data['stars'])));
-
-        match ($data['sort'] ?? 'recommended') {
-            'price_desc' => $query->orderByDesc('price_per_night'),
-            'rating_desc' => $query->orderByDesc(Hotel::query()->select('rating')->whereColumn('hotels.id', 'room_types.hotel_id')),
-            default => $query->orderBy('price_per_night'),
+        $results = match ($data['sort'] ?? 'recommended') {
+            'price_desc' => $results->sortByDesc('price_per_night'),
+            'rating_desc' => $results->sortByDesc(fn (RoomType $roomType) => $roomType->hotel?->rating ?? 0),
+            default => $results->sortBy('price_per_night'),
         };
 
-        $results = $query->get()->each(function (RoomType $roomType) use ($nights, $rooms) {
-            $roomType->setAttribute('nights', $nights);
-            $roomType->setAttribute('total_price', number_format((float) $roomType->price_per_night * $nights * $rooms, 2, '.', ''));
-        });
-
-        return response()->json(['data' => $results]);
+        return response()->json(['data' => $results->values()]);
     }
 }

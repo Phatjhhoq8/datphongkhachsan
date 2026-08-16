@@ -16,7 +16,7 @@ class CounterBookingRequest extends FormRequest
         return [
             'room_type_id' => ['required', 'exists:room_types,id'],
             'room_ids' => ['sometimes', 'array', 'min:1'],
-            'room_ids.*' => ['integer', 'distinct', 'exists:rooms,id'],
+            'room_ids.*' => ['string', 'distinct', 'exists:rooms,id'],
             'rooms' => ['required_without:room_ids', 'integer', 'min:1'],
             'guest_name' => ['required', 'string', 'max:255'],
             'guest_email' => ['required', 'email', 'max:255'],

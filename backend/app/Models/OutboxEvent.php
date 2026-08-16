@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class OutboxEvent extends Model
+class OutboxEvent extends MongoModel
 {
     protected $fillable = ['event_id', 'aggregate_type', 'aggregate_id', 'event_type', 'payload', 'occurred_at', 'published_at'];
 

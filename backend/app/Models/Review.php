@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Review extends Model
+class Review extends MongoModel
 {
     protected $fillable = ['booking_id', 'room_type_id', 'user_id', 'hotel_id', 'rating_overall', 'rating_room', 'rating_service', 'title', 'content', 'status'];
 

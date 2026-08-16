@@ -11,6 +11,7 @@ import BookingDetailView from './views/BookingDetailView.vue'
 const routes = [
   { path: '/', redirect: '/hotel' },
   { path: '/hotel', name: 'home', component: HomeView },
+  { path: '/hotel/vouchers', name: 'vouchers', component: () => import('./views/VouchersView.vue') },
   { path: '/hotel/search', name: 'search', component: SearchView },
   { path: '/hotel/booking', name: 'booking', component: BookingView },
   { path: '/hotel/booking/:code', name: 'booking-detail', component: BookingDetailView },
@@ -19,6 +20,7 @@ const routes = [
   { path: '/register', name: 'register', component: () => import('./views/RegisterView.vue'), meta: { guestOnly: true } },
   { path: '/forgot-password', name: 'forgot-password', component: () => import('./views/ForgotPasswordView.vue'), meta: { guestOnly: true } },
   { path: '/reset-password', name: 'reset-password', component: () => import('./views/ResetPasswordView.vue'), meta: { guestOnly: true } },
+  { path: '/auth/oauth/callback', name: 'oauth-callback', component: () => import('./views/OAuthCallbackView.vue') },
   {
     path: '/account',
     component: () => import('./layouts/AccountLayout.vue'),

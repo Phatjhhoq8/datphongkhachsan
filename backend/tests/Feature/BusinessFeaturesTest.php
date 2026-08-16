@@ -3,19 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
+use App\Models\Review;
 use App\Models\RoomType;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\Voucher;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\RefreshMongoDatabase;
 use Tests\TestCase;
 
 class BusinessFeaturesTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshMongoDatabase;
 
     private RoomType $roomType;
 
@@ -47,6 +48,52 @@ class BusinessFeaturesTest extends TestCase
             ->assertJsonPath('data.discount_total', 210000)
             ->assertJsonPath('data.total', 1890000)
             ->assertJsonPath('data.currency', 'VND');
+    }
+
+    public function test_seeded_service_pricing_types_are_supported_by_quote_calculator(): void
+    {
+        $services = Service::query()->orderBy('code')->get();
+
+        $this->assertEqualsCanonicalizing(
+            ['per_booking', 'per_guest', 'per_night', 'per_unit'],
+            $services->pluck('pricing_type')->all()
+        );
+        $services->each->update(['price' => 100]);
+
+        $response = $this->postJson('/api/v1/quotes', $this->quotePayload([
+            'adults' => 2,
+            'children' => 1,
+            'services' => $services->map(fn (Service $service) => ['id' => $service->id, 'quantity' => 2])->all(),
+        ]))->assertOk();
+
+        $lines = collect($response->json('data.services'))->keyBy('pricing_type');
+        $this->assertSame(2, $lines['per_booking']['quantity']);
+        $this->assertSame(4, $lines['per_night']['quantity']);
+        $this->assertSame(6, $lines['per_guest']['quantity']);
+        $this->assertSame(2, $lines['per_unit']['quantity']);
+        $response->assertJsonPath('data.service_total', 1400);
+    }
+
+    public function test_hotel_review_aggregates_only_use_published_reviews_and_the_frontend_field_name(): void
+    {
+        $hotel = $this->roomType->hotel;
+        foreach ([['published', 4], ['rejected', 1]] as [$status, $rating]) {
+            Review::query()->create([
+                'booking_id' => "aggregate-{$status}",
+                'hotel_id' => $hotel->id,
+                'room_type_id' => $this->roomType->id,
+                'rating_overall' => $rating,
+                'rating_room' => $rating,
+                'rating_service' => $rating,
+                'status' => $status,
+            ]);
+        }
+
+        $this->getJson("/api/v1/hotels/{$hotel->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.approved_reviews_count', 1)
+            ->assertJsonPath('data.approved_reviews_avg_rating', 4)
+            ->assertJsonMissingPath('data.approved_reviews_avg_rating_overall');
     }
 
     public function test_hotel_services_and_voucher_validation_are_public(): void

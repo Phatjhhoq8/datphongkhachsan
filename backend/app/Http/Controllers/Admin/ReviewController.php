@@ -16,9 +16,9 @@ class ReviewController extends AdminController
         $data = $request->validate([
             'status' => ['nullable', Rule::in(['pending', 'published', 'rejected'])],
             'rating' => ['nullable', 'integer', 'between:1,5'],
-            'hotel_id' => ['nullable', 'integer', 'exists:hotels,id'],
+            'hotel_id' => ['nullable', 'string', 'exists:hotels,id'],
         ]);
-        $hotelId = $this->scopedHotelId($request, isset($data['hotel_id']) ? (int) $data['hotel_id'] : null);
+        $hotelId = $this->scopedHotelId($request, isset($data['hotel_id']) ? (string) $data['hotel_id'] : null);
         $query = Review::query()->with(['user', 'hotel', 'roomType'])
             ->when($hotelId, fn (Builder $query) => $query->where('hotel_id', $hotelId))
             ->when(isset($data['status']), fn (Builder $query) => $query->where('status', $data['status']))
@@ -33,13 +33,15 @@ class ReviewController extends AdminController
         $hotelId = $this->scopedHotelId($request, $review->hotel_id);
         abort_if($hotelId !== null && $review->hotel_id !== $hotelId, 404);
         $data = $request->validate([
-            'status' => ['required', Rule::in(['pending', 'published', 'rejected', 'active', 'inactive'])],
+            'status' => ['required', Rule::in(['pending', 'published', 'rejected'])],
         ]);
-        $review->update(['status' => match ($data['status']) {
-            'active' => 'published',
-            'inactive' => 'rejected',
-            default => $data['status'],
-        }]);
+        $review->update(['status' => $data['status']]);
+
+        $hotel = $review->hotel;
+        if ($hotel) {
+            $avgRating = $hotel->reviews()->where('status', 'published')->avg('rating_overall');
+            $hotel->update(['rating' => round($avgRating ?? 0, 1)]);
+        }
 
         return new JsonResource($review->load(['user', 'hotel', 'roomType']));
     }
