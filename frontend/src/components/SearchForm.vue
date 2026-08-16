@@ -24,6 +24,7 @@ const form = reactive({
   rooms: Number(props.initial.rooms) || 1,
   keyword: props.initial.keyword || '',
   arrival_time: props.initial.arrival_time || defaultArrivalTime(),
+  checkout_time: props.initial.checkout_time || '12:00',
 })
 
 const destinations = ref([])
@@ -198,6 +199,10 @@ onBeforeUnmount(() => recognition?.abort())
       <input v-model="form.arrival_time" type="time" />
     </label>
     <label class="field"><span>Trả phòng</span><input v-model="form.checkout" type="date" :min="addDays(form.checkin, 1)" required /></label>
+    <label class="field">
+      <span>Giờ trả</span>
+      <input v-model="form.checkout_time" type="time" />
+    </label>
     <label class="field guest-field"><span>Khách</span><span class="guest-input"><input v-model.number="form.adults" type="number" min="1" aria-label="Số người lớn" /> khách</span></label>
     <button class="voice-button" type="button" :aria-pressed="listening" :disabled="listening" @click="startVoiceSearch">{{ listening ? 'Đang nghe...' : 'Tìm bằng giọng nói' }}</button>
     <button class="primary search-button" type="submit">Tìm khách sạn</button>

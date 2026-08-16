@@ -19,7 +19,7 @@ const loading = ref(true)
 const availabilityLoading = ref(false)
 const error = ref('')
 const availabilityError = ref('')
-const dates = computed(() => ({ checkin: route.query.checkin || addDays(today(), 1), checkout: route.query.checkout || addDays(today(), 2), adults: Number(route.query.adults || 2), children: Number(route.query.children || 0), rooms: Number(route.query.rooms || 1), location: route.query.location || '' }))
+const dates = computed(() => ({ checkin: route.query.checkin || addDays(today(), 1), checkout: route.query.checkout || addDays(today(), 2), adults: Number(route.query.adults || 2), children: Number(route.query.children || 0), rooms: Number(route.query.rooms || 1), location: route.query.location || '', arrival_time: route.query.arrival_time || '', checkout_time: route.query.checkout_time || '' }))
 const authenticated = computed(() => auth.isAuthenticated)
 const gallery = computed(() => {
   const values = (hotel.value?.room_types ?? []).flatMap(room => room.images ?? []).map(item => localImage(item.url ?? item))

@@ -34,7 +34,7 @@ function defaultArrivalTime() {
   return `${hours}:${minutes}`
 }
 
-const guest = reactive({ first_name: '', last_name: '', email: '', phone: '', special_requests: '', payment_method: 'pay_at_hotel', payment_option: 'full', arrival_time: route.query.arrival_time || defaultArrivalTime() })
+const guest = reactive({ first_name: '', last_name: '', email: '', phone: '', special_requests: '', payment_method: 'pay_at_hotel', payment_option: 'full', arrival_time: route.query.arrival_time || defaultArrivalTime(), checkout_time: route.query.checkout_time || '12:00' })
 
 const checkin = computed(() => seedQuote.value?.checkin ?? route.query.checkin)
 const checkout = computed(() => seedQuote.value?.checkout ?? route.query.checkout)
@@ -78,6 +78,8 @@ function quotePayload(code = voucherCode.value) {
     voucher_code: code || null,
     guest_email: guest.email || undefined,
     payment_option: guest.payment_option,
+    arrival_time: guest.arrival_time || null,
+    checkout_time: guest.checkout_time || null,
   }
 }
 async function requestQuote({ voucher = false } = {}) {
@@ -140,6 +142,7 @@ async function submitBooking() {
       special_requests: guest.special_requests || null,
       payment_method: ({ paypal: 'paypal_mock', credit_card: 'card_mock', vietqr: 'vietqr_mock' })[guest.payment_method] ?? guest.payment_method,
       arrival_time: guest.arrival_time || null,
+      checkout_time: guest.checkout_time || null,
     }
     const data = responseData(await api.post('/bookings', payload, { headers: { 'Idempotency-Key': idempotencyKey() } }))
     createdBooking.value = data.booking ?? data
@@ -183,7 +186,7 @@ onMounted(loadCheckout)
     <section class="booking-form-wrap"><nav class="breadcrumbs"><a href="/hotel">Trang chủ</a><span>/</span><span>Đặt phòng</span></nav><h1>Hoàn tất kỳ nghỉ</h1><p class="lead">Giá và phòng trống được xác nhận trực tiếp từ máy chủ.</p>
       <div v-if="loading" class="state-card"><span class="spinner"></span><h2>Đang lấy báo giá...</h2></div>
       <form v-else class="booking-form" @submit.prevent="submitBooking">
-        <div class="form-panel"><h2>Thông tin người liên hệ</h2><p>Xác nhận đặt phòng sẽ được gửi đến email này.</p><div class="two-columns"><label><span>Họ (không bắt buộc)</span><input v-model.trim="guest.last_name" autocomplete="family-name" /></label><label><span>Tên <span class="required-star">*</span></span><input v-model.trim="guest.first_name" autocomplete="given-name" required /></label><label><span>Email <span class="required-star">*</span></span><input v-model.trim="guest.email" type="email" autocomplete="email" required /></label><label><span>Số điện thoại <span class="required-star">*</span></span><input v-model.trim="guest.phone" type="tel" autocomplete="tel" required /></label><label class="full-width"><span>Giờ nhận phòng dự kiến</span><input v-model="guest.arrival_time" type="time" /></label></div></div>
+        <div class="form-panel"><h2>Thông tin người liên hệ</h2><p>Xác nhận đặt phòng sẽ được gửi đến email này.</p><div class="two-columns"><label><span>Họ (không bắt buộc)</span><input v-model.trim="guest.last_name" autocomplete="family-name" /></label><label><span>Tên <span class="required-star">*</span></span><input v-model.trim="guest.first_name" autocomplete="given-name" required /></label><label><span>Email <span class="required-star">*</span></span><input v-model.trim="guest.email" type="email" autocomplete="email" required /></label><label><span>Số điện thoại <span class="required-star">*</span></span><input v-model.trim="guest.phone" type="tel" autocomplete="tel" required /></label><label><span>Giờ nhận phòng dự kiến</span><input v-model="guest.arrival_time" type="time" /></label><label><span>Giờ trả phòng dự kiến</span><input v-model="guest.checkout_time" type="time" /></label></div></div>
         <div class="form-panel"><h2>Dịch vụ thêm</h2><p>Chọn trước dịch vụ để máy chủ cập nhật báo giá.</p><ServiceSelector v-model="selectedServices" :services="services" :disabled="quoting" /></div>
         <div class="form-panel"><h2>Mã ưu đãi</h2><VoucherInput v-model="voucherCode" :loading="quoting" :message="voucherMessage" :valid="voucherValid" :hotel-id="seedQuote?.hotel?.id || seedQuote?.hotel?._id" :total-amount="total" @apply="requestQuote({ voucher: true })" /></div>
         <div class="form-panel"><h2>Chính sách hủy</h2><p v-if="seedQuote?.room?.refundable === false"><strong>Không hoàn tiền:</strong> phí hủy bằng 100% tổng giá trị sau khi đặt phòng được xác nhận và thanh toán.</p><p v-else>Hủy miễn phí đến <strong>{{ cancellationDeadline }}</strong>. Sau thời điểm này, phí hủy là <strong>{{ seedQuote?.hotel?.late_cancellation_fee_percent ?? 30 }}%</strong> tổng giá trị.</p><small>Đặt phòng chờ xác nhận hoặc chưa thanh toán luôn được hủy miễn phí.</small></div>

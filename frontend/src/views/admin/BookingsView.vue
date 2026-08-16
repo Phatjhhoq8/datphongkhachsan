@@ -8,7 +8,7 @@ const auth = useAuthStore()
 const bookings = ref([]), hotels = ref([]), roomTypes = ref([]), rooms = ref([])
 const loading = ref(false), error = ref(''), search = ref(''), status = ref('')
 const open = ref(false), saving = ref(false), formError = ref('')
-const form = reactive({ guest_name: '', guest_phone: '', guest_email: '', hotel_id: '', room_type_id: '', allocation: 'quantity', room_id: '', rooms: 1, checkin: '', checkout: '', adults: 1, children: 0 })
+const form = reactive({ guest_name: '', guest_phone: '', guest_email: '', hotel_id: '', room_type_id: '', allocation: 'quantity', room_id: '', rooms: 1, checkin: '', checkout: '', adults: 1, children: 0, arrival_time: '14:00', checkout_time: '12:00' })
 const isSuperAdmin = computed(() => auth.roles.includes('super_admin'))
 const selectedHotel = computed(() => hotels.value.find(item => String(item.id) === String(form.hotel_id)))
 const availableRooms = computed(() => rooms.value.filter(room => String(room.room_type_id ?? room.room_type?.id) === String(form.room_type_id) && room.active !== false && ['available', 'cleaning'].includes(room.operational_status)))
@@ -83,6 +83,8 @@ async function createBooking() {
       checkout: form.checkout,
       adults: Number(form.adults),
       children: Number(form.children),
+      arrival_time: form.arrival_time || undefined,
+      checkout_time: form.checkout_time || undefined,
     })
     open.value = false
     await load()
@@ -121,7 +123,8 @@ onMounted(load)
       <label class="admin-field"><span>Cách chọn</span><select v-model="form.allocation" class="admin-select"><option value="quantity">Theo số lượng</option><option value="room">Chọn phòng cụ thể</option></select></label>
       <label v-if="form.allocation==='quantity'" class="admin-field"><span>Số lượng phòng</span><input v-model.number="form.rooms" class="admin-input" type="number" min="1" required /></label>
       <label v-else class="admin-field"><span>Phòng</span><select v-model="form.room_id" class="admin-select" required><option value="">-- Chọn phòng --</option><option v-for="room in availableRooms" :key="room.id" :value="String(room.id)">Phòng {{ room.room_number }} ({{ room.operational_status }})</option></select></label>
-      <label class="admin-field"><span>Ngày nhận phòng</span><input v-model="form.checkin" class="admin-input" type="date" required /></label><label class="admin-field"><span>Ngày trả phòng</span><input v-model="form.checkout" class="admin-input" type="date" required /></label>
+      <label class="admin-field"><span>Ngày nhận phòng</span><input v-model="form.checkin" class="admin-input" type="date" required /></label><label class="admin-field"><span>Giờ nhận dự kiến</span><input v-model="form.arrival_time" class="admin-input" type="time" required /></label>
+      <label class="admin-field"><span>Ngày trả phòng</span><input v-model="form.checkout" class="admin-input" type="date" required /></label><label class="admin-field"><span>Giờ trả dự kiến</span><input v-model="form.checkout_time" class="admin-input" type="time" required /></label>
       <label class="admin-field full"><span>Họ tên khách</span><input v-model="form.guest_name" class="admin-input" required /></label><label class="admin-field"><span>Email</span><input v-model="form.guest_email" class="admin-input" type="email" required /></label><label class="admin-field"><span>Điện thoại</span><input v-model="form.guest_phone" class="admin-input" required /></label><label class="admin-field"><span>Người lớn</span><input v-model.number="form.adults" class="admin-input" type="number" min="1" required /></label><label class="admin-field"><span>Trẻ em</span><input v-model.number="form.children" class="admin-input" type="number" min="0" /></label>
     </div></div><footer class="admin-modal-foot"><button class="admin-button secondary" type="button" @click="open=false">Hủy</button><button class="admin-button" :disabled="saving">{{ saving?'Đang lưu...':'Tạo đặt phòng' }}</button></footer></form></div>
   </section>

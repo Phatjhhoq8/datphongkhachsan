@@ -51,6 +51,7 @@ function searchParams() {
     children: Number(route.query.children || 0),
     keyword: route.query.keyword || '',
     arrival_time: route.query.arrival_time || '',
+    checkout_time: route.query.checkout_time || '',
   }
 }
 
@@ -73,6 +74,7 @@ async function fetchHotels() {
       refundable: filters.value.refundable ? 1 : undefined,
       keyword: route.query.keyword || undefined,
       arrival_time: route.query.arrival_time || undefined,
+      checkout_time: route.query.checkout_time || undefined,
     }
     hotels.value = responseList(await api.get('/search', { params }))
   } catch (err) {
