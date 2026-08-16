@@ -187,6 +187,15 @@ async function confirmMockPayment(cardData) {
 
 let quoteTimer
 watch([selectedServices, () => guest.payment_option, checkin, checkout, () => guest.arrival_time, () => guest.checkout_time], () => { if (!loading.value) { clearTimeout(quoteTimer); quoteTimer = setTimeout(() => requestQuote(), 250) } }, { deep: true })
+function calculateLateTime(timeStr, graceMinutes) {
+  if (!timeStr) return ''
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  const totalMinutes = hours * 60 + minutes + Number(graceMinutes)
+  const lateHours = Math.floor(totalMinutes / 60) % 24
+  const lateMinutes = totalMinutes % 60
+  return `${String(lateHours).padStart(2, '0')}:${String(lateMinutes).padStart(2, '0')}`
+}
+
 onMounted(loadCheckout)
 </script>
 
@@ -213,12 +222,14 @@ onMounted(loadCheckout)
           <div class="late-checkout-policy">
             <h3 style="font-size: 13.5px; font-weight: 700; color: #13243a; margin-bottom: 8px;">Chính sách trả phòng trễ (Late Checkout)</h3>
             <p style="font-size: 12.5px; margin: 4px 0;">Thời gian nhận phòng tiêu chuẩn: từ <strong>{{ seedQuote?.hotel?.checkin_time ?? '14:00' }}</strong>.</p>
-            <p style="font-size: 12.5px; margin: 4px 0;">Thời gian trả phòng tiêu chuẩn: trước <strong>{{ seedQuote?.hotel?.checkout_time ?? '12:00' }}</strong>.</p>
-            <p style="font-size: 12.5px; margin: 4px 0;">Thời gian dọn dẹp và chuẩn bị phòng: <strong>{{ seedQuote?.hotel?.cleaning_duration_minutes ?? 150 }} phút</strong>.</p>
+            <p style="font-size: 12.5px; margin: 4px 0;">Thời gian trả phòng quý khách đã chọn: trước <strong>{{ guest.checkout_time || seedQuote?.hotel?.checkout_time || '12:00' }}</strong>.</p>
             <p style="font-size: 12.5px; margin: 4px 0;">Thời gian châm chước trả trễ miễn phí: <strong>{{ seedQuote?.hotel?.late_checkout_grace_minutes ?? 30 }} phút</strong>.</p>
-            <p style="color: #991b1b; font-size: 12.5px; font-weight: 600; margin-top: 8px;">
-              ⚠️ Nếu quý khách trả phòng trễ quá thời gian châm chước (grace period), phí phạt trả trễ sẽ được áp dụng tự động bằng <strong>10% giá phòng mỗi đêm cho mỗi giờ trễ</strong> (làm tròn lên theo giờ).
+            <p style="color: #991b1b; font-size: 12.5px; font-weight: 600; margin-top: 8px; line-height: 1.5;">
+              ⚠️ Nếu thực tế quý khách trả phòng muộn quá <strong>{{ calculateLateTime(guest.checkout_time || seedQuote?.hotel?.checkout_time || '12:00', seedQuote?.hotel?.late_checkout_grace_minutes ?? 30) }}</strong> (tức là quá giờ trả phòng đã chọn + {{ seedQuote?.hotel?.late_checkout_grace_minutes ?? 30 }} phút châm chước), phí phạt trả muộn sẽ được áp dụng tự động bằng <strong>10% giá phòng của 1 đêm cho mỗi giờ trễ</strong> (làm tròn lên theo giờ).
             </p>
+            <small style="display: block; color: #637083; margin-top: 6px; font-size: 11px; line-height: 1.4;">
+              * Ví dụ: Nếu giá phòng của hạng phòng này là 1.000.000 VND/đêm, phí phạt trễ sẽ là 100.000 VND cho mỗi giờ trễ (10% của 1.000.000 VND). Phí này chỉ phát sinh khi trả phòng thực tế bị trễ.
+            </small>
           </div>
         </div>
         <div class="form-panel"><h2>Thanh toán bao nhiêu?</h2><div class="payment-split"><label><input v-model="guest.payment_option" type="radio" value="deposit" /><span><strong>Đặt cọc {{ depositPercent > 0 && depositPercent < 100 ? `${depositPercent}%` : '' }}</strong><small>Thanh toán khoản cọc tương đương {{ depositPercent > 0 && depositPercent < 100 ? `${depositPercent}%` : 'một phần' }} tổng tiền.</small></span></label><label><input v-model="guest.payment_option" type="radio" value="full" /><span><strong>Toàn bộ (100%)</strong><small>Thanh toán toàn bộ giá trị đặt phòng.</small></span></label></div></div>
