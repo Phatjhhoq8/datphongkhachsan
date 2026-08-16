@@ -66,7 +66,14 @@ class SearchController extends Controller
                     && ($requestedTypes === [] || collect($requestedTypes)->contains(fn ($type) => str_contains($typeText, $type)))
                     && ($keyword === '' || str_contains($typeText, $keyword))
                     && (! ($data['refundable'] ?? false) || $roomType->refundable)
-                    && (empty($stars) || in_array((int) $roomType->hotel?->star_rating, $stars, true));
+                    && (function() use ($roomType, $stars) {
+                        if (empty($stars)) return true;
+                        $starRating = (int) ($roomType->hotel?->star_rating ?? 5);
+                        if ($starRating <= 0) {
+                            $starRating = 5;
+                        }
+                        return in_array($starRating, $stars, true);
+                    })();
             })
             ->each(function (RoomType $roomType) use ($nights, $rooms) {
                 if ($roomType->hotel) {
