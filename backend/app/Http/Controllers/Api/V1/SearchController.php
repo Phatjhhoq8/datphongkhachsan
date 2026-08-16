@@ -25,8 +25,31 @@ class SearchController extends Controller
 
         $results = RoomType::query()->where('active', true)->with(['hotel.approvedReviews', 'images', 'amenities'])->get()
             ->filter(function (RoomType $roomType) use ($data, $rooms, $children, $location, $requestedAmenities, $requestedTypes, $keyword, $availability): bool {
+                $timeToMinutes = function (string $time): int {
+                    list($hours, $minutes) = explode(':', $time);
+                    return ((int) $hours * 60) + (int) $minutes;
+                };
+
+                if (isset($data['checkout_time'])) {
+                    $hotel = $roomType->hotel;
+                    if ($hotel) {
+                        $checkinTimeStr = $hotel->checkin_time;
+                        $grace = (int) $hotel->late_checkout_grace_minutes;
+                        $cleaning = (int) $hotel->cleaning_duration_minutes;
+                        $totalBufferMinutes = $grace + $cleaning;
+
+                        $checkinMinutes = $timeToMinutes($checkinTimeStr);
+                        $checkoutMinutes = $timeToMinutes($data['checkout_time']);
+
+                        if ($checkoutMinutes + $totalBufferMinutes > $checkinMinutes) {
+                            return false;
+                        }
+                    }
+                }
+
                 $checkinParam = isset($data['arrival_time']) ? "{$data['checkin']} {$data['arrival_time']}" : $data['checkin'];
-                $available = $availability->rooms($roomType, $checkinParam, $data['checkout'])->count();
+                $checkoutParam = isset($data['checkout_time']) ? "{$data['checkout']} {$data['checkout_time']}" : $data['checkout'];
+                $available = $availability->rooms($roomType, $checkinParam, $checkoutParam)->count();
                 $roomType->setAttribute('available_rooms', $available);
                 $hotelText = mb_strtolower(implode(' ', [$roomType->hotel?->city, $roomType->hotel?->name, $roomType->hotel?->address]));
                 $amenitySlugs = $roomType->amenities->pluck('slug')->all();

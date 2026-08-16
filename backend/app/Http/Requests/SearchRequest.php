@@ -41,6 +41,7 @@ class SearchRequest extends FormRequest
             'stars.*' => ['integer', 'between:1,5', 'distinct'],
             'sort' => ['nullable', 'in:recommended,price_asc,price_desc,rating_desc'],
             'arrival_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
+            'checkout_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
         ];
     }
 }

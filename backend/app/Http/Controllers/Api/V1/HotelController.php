@@ -73,13 +73,41 @@ class HotelController extends Controller
             'rooms' => ['nullable', 'integer', 'between:1,20'],
             'adults' => ['nullable', 'integer', 'between:1,100'],
             'children' => ['nullable', 'integer', 'between:0,100'],
+            'arrival_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
+            'checkout_time' => ['nullable', 'string', 'regex:/^(?:[01]\d|2[0-3]):[0-5]\d$/'],
         ]);
+
+        if (isset($data['checkout_time']) && isset($data['checkin'])) {
+            $timeToMinutes = function (string $time): int {
+                list($hours, $minutes) = explode(':', $time);
+                return ((int) $hours * 60) + (int) $minutes;
+            };
+
+            $checkinTimeStr = $hotel->checkin_time;
+            $grace = (int) $hotel->late_checkout_grace_minutes;
+            $cleaning = (int) $hotel->cleaning_duration_minutes;
+            $totalBufferMinutes = $grace + $cleaning;
+
+            $checkinMinutes = $timeToMinutes($checkinTimeStr);
+            $checkoutMinutes = $timeToMinutes($data['checkout_time']);
+
+            if ($checkoutMinutes + $totalBufferMinutes > $checkinMinutes) {
+                $latestAllowedMinutes = $checkinMinutes - $totalBufferMinutes;
+                $latestTime = sprintf('%02d:%02d', floor($latestAllowedMinutes / 60), $latestAllowedMinutes % 60);
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'checkout_time' => "Giờ checkout không được muộn hơn {$latestTime} để đảm bảo thời gian dọn phòng ({$cleaning} phút) và trả trễ ({$grace} phút)."
+                ]);
+            }
+        }
+
         $rooms = (int) ($data['rooms'] ?? 1);
         $hotel->load(['roomTypes.images', 'roomTypes.amenities', 'approvedReviews']);
         $roomTypes = $hotel->roomTypes
             ->where('active', true)
             ->filter(function (RoomType $roomType) use ($data, $rooms, $availability): bool {
-                $available = $availability->rooms($roomType, $data['checkin'] ?? null, $data['checkout'] ?? null)->count();
+                $checkinParam = isset($data['arrival_time']) ? "{$data['checkin']} {$data['arrival_time']}" : ($data['checkin'] ?? null);
+                $checkoutParam = isset($data['checkout_time']) ? "{$data['checkout']} {$data['checkout_time']}" : ($data['checkout'] ?? null);
+                $available = $availability->rooms($roomType, $checkinParam, $checkoutParam)->count();
                 $roomType->setAttribute('available_rooms', $available);
 
                 return $available >= $rooms

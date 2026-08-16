@@ -242,6 +242,35 @@ class BusinessFeaturesTest extends TestCase
         return Booking::query()->findOrFail($response->json('data.id'));
     }
 
+    public function test_search_and_hotel_detail_checkout_time_validation(): void
+    {
+        $hotel = $this->roomType->hotel;
+        $hotel->update([
+            'checkin_time' => '15:00',
+            'checkout_time' => '12:00',
+            'late_checkout_grace_minutes' => 30,
+            'cleaning_duration_minutes' => 150,
+        ]);
+
+        $searchResponse = $this->getJson("/api/v1/search?location=" . urlencode($hotel->city) . "&checkin={$this->checkin}&checkout={$this->checkout}&rooms=1&adults=2&checkout_time=14:00")
+            ->assertOk();
+        
+        $this->assertEmpty(
+            collect($searchResponse->json('data'))->where('id', $this->roomType->id)->all()
+        );
+
+        $searchResponseValid = $this->getJson("/api/v1/search?location=" . urlencode($hotel->city) . "&checkin={$this->checkin}&checkout={$this->checkout}&rooms=1&adults=2&checkout_time=11:00")
+            ->assertOk();
+
+        $this->assertNotEmpty(
+            collect($searchResponseValid->json('data'))->where('id', $this->roomType->id)->all()
+        );
+
+        $this->getJson("/api/v1/hotels/{$hotel->slug}?checkin={$this->checkin}&checkout={$this->checkout}&rooms=1&adults=2&checkout_time=14:00")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['checkout_time']);
+    }
+
     private function quotePayload(array $overrides = []): array
     {
         return array_merge([
