@@ -21,7 +21,8 @@ const amenityOptions = computed(() => uniqueOptions(catalog.value.flatMap(hotel 
 
 const sortedHotels = computed(() => {
   const result = hotels.value.filter(roomType => {
-    const stars = Number(roomType.hotel?.stars ?? roomType.hotel?.star_rating ?? 0)
+    let stars = Number(roomType.hotel?.stars ?? roomType.hotel?.star_rating ?? 5)
+    if (stars <= 0) stars = 5
     const slug = String(roomType.slug ?? roomType.room_type ?? roomType.name ?? '').toLowerCase()
     const matchesStars = !filters.value.stars.length || filters.value.stars.includes(stars)
     const matchesType = !filters.value.room_type.length || filters.value.room_type.some(type => slug.includes(type))
